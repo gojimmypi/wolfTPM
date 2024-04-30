@@ -50,15 +50,13 @@ void app_main(void)
 {
     int ret = 0;
     int * argument = NULL;
-    ESP_LOGI(TAG, "Hello wolfSSL!");
+    ESP_LOGI(TAG, "Hello wolfTPM!");
 
 #ifdef HAVE_VERSION_EXTENDED_INFO
     ret = esp_ShowExtendedSystemInfo();
 #endif
 
-#if defined(WOLFSSL_HW_METRICS) && defined(WOLFSSL_HAS_METRICS)
     ret += TPM2_Wrapper_Test((void*)argument);
-#endif
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE
     if (ret == 0) {

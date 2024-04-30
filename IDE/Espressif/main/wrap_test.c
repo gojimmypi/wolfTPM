@@ -42,6 +42,8 @@
     #define ENABLE_LARGE_HASH_TEST  /* optional large hash test */
 #endif
 
+#define TAG "wrap_Test"
+#include <esp_log.h>
 
 /******************************************************************************/
 /* --- BEGIN Wrapper API Tests -- */
@@ -168,7 +170,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
         argc--;
     }
 
-    printf("TPM2 Demo for Wrapper API's\n");
+    ESP_LOGI(TAG, "TPM2 Demo for Wrapper API's\n");
 
 
     /* Init the TPM2 device */
