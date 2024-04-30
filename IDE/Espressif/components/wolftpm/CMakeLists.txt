@@ -33,7 +33,7 @@ set(VERBOSE_COMPONENT_MESSAGES 1)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS")
 
 set(CMAKE_CURRENT_SOURCE_DIR ".")
-set(COMPONENT_REQUIRES wolfssl) # we typically don't need lwip directly in wolfssl component
+set(COMPONENT_REQUIRES wolfssl driver) # "driver" includes the I2C API
 
 # Optionally set your source to wolfSSL in your project CMakeLists.txt like this:
 # set(WOLFTPM_ROOT "c:/test/my_wolfssl" )

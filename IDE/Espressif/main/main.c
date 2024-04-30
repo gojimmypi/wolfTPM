@@ -37,7 +37,9 @@
     #error "Missing WOLFSSL_USER_SETTINGS in CMakeLists or Makefile:\
     CFLAGS +=-DWOLFSSL_USER_SETTINGS"
 #endif
+// #include "wolftpm_test.h"
 
+#include <wolfssl/internal.h>
 
 /* project */
 #include "main.h"
@@ -49,14 +51,15 @@ extern int TPM2_Wrapper_Test(void* userCtx);
 void app_main(void)
 {
     int ret = 0;
-    int * argument = NULL;
     ESP_LOGI(TAG, "Hello wolfTPM!");
 
 #ifdef HAVE_VERSION_EXTENDED_INFO
     ret = esp_ShowExtendedSystemInfo();
 #endif
+    WOLFSSL_CTX* ctx;
+    ctx = (WOLFSSL_CTX*)XMALLOC(sizeof(WOLFSSL_CTX), NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
-    ret += TPM2_Wrapper_Test((void*)argument);
+    ret += TPM2_Wrapper_Test(ctx);
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE
     if (ret == 0) {
