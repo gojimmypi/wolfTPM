@@ -1,5 +1,7 @@
 # wolfTPM for Espressif
 
+Initial minimum memory requirements: 35KB Stack. See `sdkconfig.defaults`.
+
 ## TODO
 
 Currently the `components\wolftpm\include\options.h` is not found by the respective component `CMakeLists.txt`, 
