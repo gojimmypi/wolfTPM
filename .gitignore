@@ -32,7 +32,7 @@ RemoteSystemsTempFiles
 *.dSYM
 .vs
 IDE/IAR-EWARM/settings
-wolftpm/options.h
+# wolftpm/options.h
 
 # common cmake build location
 build/
@@ -162,3 +162,10 @@ UpgradeLog.htm
 /IDE/Espressif/**/sdkconfig
 /IDE/Espressif/**/sdkconfig.old
 
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32.vgdbproj.gojimmypi.user
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32C2.vgdbproj
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32C3.vgdbproj
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32C6.vgdbproj
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32H2.vgdbproj
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32S2.vgdbproj
+/IDE/Espressif/VisualGDB/wolfssl_IDF_v5.2_ESP32S3.vgdbproj
