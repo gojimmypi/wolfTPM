@@ -31,9 +31,25 @@
 #include <wolftpm/tpm2_tis.h>
 #include "tpm_io.h"
 
-#define TAG "TPM_IO"
+/*****************************************************************************/
+/* --- BEGIN IO Callback Logic -- */
+/*****************************************************************************/
+
+/* Included via tpm_io.c if WOLFTPM_INCLUDE_IO_FILE is defined */
+#ifdef WOLFTPM_INCLUDE_IO_FILE
+
+#ifdef WOLFSSL_ESPIDF
 
 /* Espressif */
+#include "sdkconfig.h"
+
+#define TAG "TPM_IO"
+
+#ifdef WOLFTPM_I2C
+
+#define I2C_READ_WAIT_TICKS  (I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS)
+#define I2C_WRITE_WAIT_TICKS (I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS)
+
 /* To use I2C in wolfTPM, be sure the compnent cmake COMPONENT_REQUIRES
  * variable includes "driver" (without quotes) for idf_component_register().
  *
@@ -58,6 +74,7 @@
 
 /* GPIO number used for I2C master clock */
 #ifdef CONFIG_I2C_MASTER_SCL
+    /* Yellow wire */
     #define I2C_MASTER_SCL_IO           CONFIG_I2C_MASTER_SCL
 #else
     /* There should have been a Kconfig.projbuild file in the ./main
@@ -65,9 +82,9 @@
     #error "Could not find CONFIG_I2C_MASTER_SCL definition."
 #endif
 
-
 /* GPIO number used for I2C master data */
 #ifdef CONFIG_I2C_MASTER_SDA
+    /* Orange wire */
     #define I2C_MASTER_SDA_IO           CONFIG_I2C_MASTER_SDA
 #else
     /* There should have been a Kconfig.projbuild file in the ./main
@@ -79,7 +96,13 @@
  * the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_NUM              0
 
-/* I2C master clock frequency */
+/* I2C master clock frequency
+ *   Typically, an I2C slave device has a 7-bit address or 10-bit address.
+ *   ESP32 supports both I2C Standard-mode (Sm) and Fast-mode (Fm) which
+ *   can go up to 100KHz and 400KHz respectively.
+ *
+ *   The clock frequency of SCL in master mode
+ *   should not be larger than 400 KHz. */
 #define I2C_MASTER_FREQ_HZ          400000
 
 /* I2C master doesn't need buffer, so disabled: */
@@ -88,16 +111,24 @@
 /* I2C master doesn't need buffer, so disabled: */
 #define I2C_MASTER_RX_BUF_DISABLE   0
 
-#define I2C_MASTER_TIMEOUT_MS       1000
+/* Wait timeout, in millisecondss. Note: -1 means wait forever. */
+#define I2C_MASTER_TIMEOUT_MS       10000
 
-/* I2C test seneor is an LM75 temperature sensor */
+/* Infineon 9673 I2C at 0x2e */
+#define TPM2_INFINEON_9673_ADDR     0x2e
+
+/* I2C test sensor is an LM75 temperature sensor at 0x48 */
 #define LM75_SENSOR_ADDR            0x48
 
+
+#if 0
+    #define TPM2_I2C_ADDR           LM75_SENSOR_ADDR
+#else
+    #define TPM2_I2C_ADDR           TPM2_INFINEON_9673_ADDR
+#endif
 static int is_initialized_i2c = 0;
 
-/**
- * @brief i2c master initialization
- */
+/* i2c master initialization */
 static esp_err_t i2c_master_init(void)
 {
     int i2c_master_port = I2C_MASTER_NUM;
@@ -115,7 +146,7 @@ static esp_err_t i2c_master_init(void)
 
     i2c_param_config(i2c_master_port, &conf);
 #else
-    ESP_LOGE(TAG, "Need to implement non-legacyupdated ESP-IDF I2C library");
+    ESP_LOGE(TAG, "Need to implement non-legacy ESP-IDF I2C library");
 #endif
 
     ret = i2c_driver_install(i2c_master_port, conf.mode,
@@ -131,30 +162,25 @@ static esp_err_t i2c_master_init(void)
     return ret;
 }
 
-
-/*****************************************************************************/
-/* --- BEGIN IO Callback Logic -- */
-/*****************************************************************************/
-#ifdef WOLFTPM_I2C
-
-#define I2C_READ_WAIT_TICKS  (I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS)
-#define I2C_WRITE_WAIT_TICKS (I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS)
-
-static esp_err_t lm75_register_read(uint8_t reg_addr,
+static esp_err_t tpm_register_read(uint8_t reg_addr,
                                     uint8_t *data, size_t len)
 {
     int ret;
-    ret = i2c_master_write_read_device(I2C_MASTER_NUM, LM75_SENSOR_ADDR,
-                                        &reg_addr, 1, data, len,
+//    ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+//                                      data, len,
+//                                      I2C_READ_WAIT_TICKS);
+    ret = i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                        &reg_addr, 1, /* write buffer, len */
+                                        data,     len,
                                         I2C_READ_WAIT_TICKS);
     return ret;
 }
 
-static esp_err_t lm75_register_write_byte(uint8_t reg_addr,
-                                          uint8_t* data, size_t len)
+static esp_err_t tpm_register_write(uint8_t reg_addr,
+                                    uint8_t* data, size_t len)
 {
     int ret;
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, LM75_SENSOR_ADDR,
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                      data, len,
                                      I2C_WRITE_WAIT_TICKS);
     return ret;
@@ -163,12 +189,13 @@ static esp_err_t lm75_register_write_byte(uint8_t reg_addr,
 static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
 {
     int ret;
-    ret = lm75_register_read(LM75_SENSOR_ADDR, data, len);
+    ret = tpm_register_read(TPM2_I2C_ADDR, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGV(TAG, "Read successfully");
+        ESP_LOGI(TAG, "Read device 0x%x success.", TPM2_I2C_ADDR);
         ret = TPM_RC_SUCCESS;
     }
     else {
+        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d", TPM2_I2C_ADDR, ret);
         ret = TPM_RC_FAILURE;
     }
     return ret;
@@ -177,32 +204,45 @@ static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
 static int tpm_ifx_i2c_write(void* userCtx, word32 reg, byte* data, int len)
 {
     int ret;
-    ret = lm75_register_write_byte(LM75_SENSOR_ADDR, data, len);
+    ret = tpm_register_write(TPM2_I2C_ADDR, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGV(TAG, "Read successfully");
+        ESP_LOGI(TAG, "Write device 0x%x success.", TPM2_I2C_ADDR);
         ret = TPM_RC_SUCCESS;
     }
     else {
+        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d", TPM2_I2C_ADDR, ret);
         ret = TPM_RC_FAILURE;
     }
     return ret;
 }
 
-
 int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
                             byte* buf, word16 size, void* userCtx)
 {
     int ret = TPM_RC_FAILURE;
-    if (userCtx != NULL) {
-        if (!is_initialized_i2c) {
+    if (userCtx == NULL) {
+        ESP_LOGE(TAG, "userCtx cannot be null");
+    }
+    else {
+        if (is_initialized_i2c) {
+            ESP_LOGV(TAG, "I2C already initialized");
+            ret = ESP_OK;
+        }
+        else {
             ret = i2c_master_init();
         }
 
-        if (isRead) {
-            ret = tpm_ifx_i2c_read(userCtx, addr, buf, size);
+        if (ret == ESP_OK) {
+            if (isRead) {
+                ret = tpm_ifx_i2c_read(userCtx, addr, buf, size);
+            }
+            else {
+                ret = tpm_ifx_i2c_write(userCtx, addr, buf, size);
+            }
         }
         else {
-            ret = tpm_ifx_i2c_write(userCtx, addr, buf, size);
+            ESP_LOGE(TAG, "I2C Failed to initialize. Error: %d", ret);
+            ret = TPM_RC_FAILURE;
         }
     }
     (void)ctx;
@@ -219,5 +259,12 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
         #error SPI check wait state logic not supported
     #endif
 
-    #error "not implemented"
+    #error TPM2 SPI support on this platform not supported yet
 #endif
+
+#endif /* WOLFSSL_ESPIDF */
+#endif /* WOLFTPM_INCLUDE_IO_FILE */
+
+/******************************************************************************/
+/* --- END IO Callback Logic -- */
+/******************************************************************************/
