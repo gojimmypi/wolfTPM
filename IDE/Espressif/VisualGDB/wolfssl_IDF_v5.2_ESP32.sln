@@ -5,6 +5,13 @@ VisualStudioVersion = 17.8.34601.278
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "wolfssl_IDF_v5.2_ESP32", "wolfssl_IDF_v5.2_ESP32.vgdbproj", "{EADCC9AB-72B3-4B51-A838-593E5D80DDF7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Espressif Files", "Espressif Files", "{D6BFEB43-3140-472F-BAD1-BADC700D4BFA}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\hal\tpm_io.c = ..\..\..\hal\tpm_io.c
+		..\..\..\hal\tpm_io.h = ..\..\..\hal\tpm_io.h
+		..\..\..\hal\tpm_io_espressif.c = ..\..\..\hal\tpm_io_espressif.c
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|VisualGDB = Debug|VisualGDB
