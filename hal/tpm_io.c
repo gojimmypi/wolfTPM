@@ -123,7 +123,7 @@ int TPM2_IoCb(TPM2_CTX* ctx, INT32 isRead, UINT32 addr,
 #endif
 
 #ifdef WOLFTPM_DEBUG_IO
-    printf("TPM2_IoCb (Adv): Read %d, Addr %x, Size %d\n",
+    printf("TPM2_IoCb (Adv): Read %d, Addr 0x%lx, Size %d\n",
         isRead ? 1 : 0, addr, size);
     if (!isRead) {
         printf("Write Size %d\n", size);
