@@ -105,7 +105,8 @@
  *   should not be larger than 400 KHz. */
 #ifndef I2C_MASTER_FREQ_HZ
     #define I2C_MASTER_FREQ_HZ          100000
-#endif
+#endif
+
 /* I2C master doesn't need buffer, so disabled: */
 #define I2C_MASTER_TX_BUF_DISABLE   0
 
@@ -113,7 +114,7 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0
 
 /* Wait timeout, in millisecondss. Note: -1 means wait forever. */
-#define I2C_MASTER_TIMEOUT_MS       10000
+#define I2C_MASTER_TIMEOUT_MS       200000
 
 /* Infineon 9673 I2C at 0x2e */
 #define TPM2_INFINEON_9673_ADDR     0x2e
@@ -132,16 +133,25 @@ static int is_initialized_i2c = 0;
 static int is_init_read = 1; /* TODO is this actually helpful? */
 
 
+static int show_binary(byte* theVar, size_t dataSz) {
+    printf("*****************************************************\n");
+    word32 i;
+    for (i = 0; i < dataSz; i++)
+        printf("%02X", theVar[i]);
+    printf("\n");
+    printf("******************************************************\n");
+    return 0;
+}
 /* i2c master initialization */
 static esp_err_t i2c_master_init(void)
 {
     int i2c_master_port = I2C_MASTER_NUM;
     esp_err_t ret = ESP_OK;
     ESP_LOGI(TAG, "i2c_master_init");
-    ESP_LOGI(TAG, "I2C_MASTER_FREQ_HZ   = %d", (int)I2C_MASTER_FREQ_HZ);
-    ESP_LOGI(TAG, "I2C_READ_WAIT_TICKS  = %d", (int)I2C_READ_WAIT_TICKS);
-    ESP_LOGI(TAG, "I2C_WRITE_WAIT_TICKS = %d", (int)I2C_WRITE_WAIT_TICKS);
-
+    ESP_LOGI(TAG, "I2C_MASTER_FREQ_HZ    = %d", (int)I2C_MASTER_FREQ_HZ);
+    ESP_LOGI(TAG, "I2C_READ_WAIT_TICKS   = %d", (int)I2C_READ_WAIT_TICKS);
+    ESP_LOGI(TAG, "I2C_WRITE_WAIT_TICKS  = %d", (int)I2C_WRITE_WAIT_TICKS);
+    ESP_LOGI(TAG, "I2C_MASTER_TIMEOUT_MS = %d", (int)I2C_MASTER_TIMEOUT_MS);
 
 #if WOLFSSL_USE_LEGACY_I2C
     i2c_config_t conf = {
@@ -208,9 +218,15 @@ static esp_err_t tpm_register_read(uint32_t reg,
 
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
+        show_binary(data, len);
     }
     else {
-        ESP_LOGI(TAG, "ERROR: i2c_master_write_read_device failed with code = %d", ret);
+        if (ret == ESP_ERR_TIMEOUT) {
+            ESP_LOGE(TAG, "ERROR: tpm_register_read failed ESP_ERR_TIMEOUT");
+        }
+        else {
+            ESP_LOGE(TAG, "ERROR: tpm_register_read failed error = %d", ret);
+        }
         if (DELETE_I2C_ON_ERROR) {
             i2c_master_delete();
         }
@@ -222,14 +238,15 @@ static esp_err_t tpm_register_write(uint32_t reg_addr,
                                     uint8_t* data, size_t len)
 {
     int ret;
-    ESP_LOGI(TAG, "TPM Write init %d", is_init_read);
+    ESP_LOGI(TAG, "TPM Write init state = %d. Len = %d", is_init_read, len);
+    show_binary(data, len);
     ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                      data, len,
                                      I2C_WRITE_WAIT_TICKS);
     is_init_read = 1;
 
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Success! tpm_register_write");
+        ESP_LOGI(TAG, "Success! tpm_register_write wrote %d bytes", len);
     }
     else {
         ESP_LOGI(TAG, "ERROR: tpm_register_write failed with code = %d", ret);
@@ -246,11 +263,11 @@ static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
     int ret;
     ret = tpm_register_read(reg, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Read device 0x%x success.", TPM2_I2C_ADDR);
+        ESP_LOGI(TAG, "Read device 0x%x success.\n", TPM2_I2C_ADDR);
         ret = TPM_RC_SUCCESS;
     }
     else {
-        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d", TPM2_I2C_ADDR, ret);
+        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d\n", TPM2_I2C_ADDR, ret);
         ret = TPM_RC_FAILURE;
     }
     return ret;
@@ -261,11 +278,11 @@ static int tpm_ifx_i2c_write(void* userCtx, word32 reg, byte* data, int len)
     int ret;
     ret = tpm_register_write(reg, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Write device 0x%x success 0x%x len = %d.", TPM2_I2C_ADDR, (word32)data, len);
+        ESP_LOGI(TAG, "Write device 0x%x success 0x%x len = %dn.", TPM2_I2C_ADDR, (word32)data, len);
         ret = TPM_RC_SUCCESS;
     }
     else {
-        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d", TPM2_I2C_ADDR, ret);
+        ESP_LOGE(TAG, "Read device 0x%x fail. Error = %d\n", TPM2_I2C_ADDR, ret);
         ret = TPM_RC_FAILURE;
     }
     return ret;
