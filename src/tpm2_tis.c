@@ -259,6 +259,12 @@ int TPM2_TIS_StartupWait(TPM2_CTX* ctx, int timeout)
     do {
         rc = TPM2_TIS_Read(ctx, TPM_ACCESS(0), &access, sizeof(access));
         /* if chip isn't present MISO will be high and return 0xFF */
+        if (access == 0xFF) {
+            ESP_LOGW("tpm", "access == 0xFF, try = %d", timeout);
+        }
+        else {
+            ESP_LOGI("tpm", "access == 0x%x\n", access);
+        }
         if (rc == TPM_RC_SUCCESS && (access & TPM_ACCESS_VALID) &&
                 (access != 0xFF)) {
             return TPM_RC_SUCCESS;
