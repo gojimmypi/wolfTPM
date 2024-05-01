@@ -103,8 +103,9 @@
  *
  *   The clock frequency of SCL in master mode
  *   should not be larger than 400 KHz. */
-#define I2C_MASTER_FREQ_HZ          400000
-
+#ifndef I2C_MASTER_FREQ_HZ
+    #define I2C_MASTER_FREQ_HZ          100000
+#endif
 /* I2C master doesn't need buffer, so disabled: */
 #define I2C_MASTER_TX_BUF_DISABLE   0
 
@@ -120,6 +121,7 @@
 /* I2C test sensor is an LM75 temperature sensor at 0x48 */
 #define LM75_SENSOR_ADDR            0x48
 
+#define DELETE_I2C_ON_ERROR         0
 
 #if 0
     #define TPM2_I2C_ADDR           LM75_SENSOR_ADDR
@@ -127,12 +129,19 @@
     #define TPM2_I2C_ADDR           TPM2_INFINEON_9673_ADDR
 #endif
 static int is_initialized_i2c = 0;
+static int is_init_read = 1; /* TODO is this actually helpful? */
+
 
 /* i2c master initialization */
 static esp_err_t i2c_master_init(void)
 {
     int i2c_master_port = I2C_MASTER_NUM;
     esp_err_t ret = ESP_OK;
+    ESP_LOGI(TAG, "i2c_master_init");
+    ESP_LOGI(TAG, "I2C_MASTER_FREQ_HZ   = %d", (int)I2C_MASTER_FREQ_HZ);
+    ESP_LOGI(TAG, "I2C_READ_WAIT_TICKS  = %d", (int)I2C_READ_WAIT_TICKS);
+    ESP_LOGI(TAG, "I2C_WRITE_WAIT_TICKS = %d", (int)I2C_WRITE_WAIT_TICKS);
+
 
 #if WOLFSSL_USE_LEGACY_I2C
     i2c_config_t conf = {
@@ -150,9 +159,10 @@ static esp_err_t i2c_master_init(void)
 #endif
 
     ret = i2c_driver_install(i2c_master_port, conf.mode,
-                              I2C_MASTER_RX_BUF_DISABLE,
-                              I2C_MASTER_TX_BUF_DISABLE, 0);
+                             I2C_MASTER_RX_BUF_DISABLE,
+                             I2C_MASTER_TX_BUF_DISABLE, 0);
     if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "i2c driver install success");
         is_initialized_i2c = TRUE;
     }
     else {
@@ -162,34 +172,79 @@ static esp_err_t i2c_master_init(void)
     return ret;
 }
 
-static esp_err_t tpm_register_read(uint8_t reg_addr,
+static esp_err_t i2c_master_delete(void)
+{
+    ESP_LOGI(TAG, "i2c_master_delete");
+    ESP_ERROR_CHECK(i2c_driver_delete(I2C_MASTER_NUM));
+    is_initialized_i2c = FALSE;
+    return ESP_OK;
+}
+
+/* Espressif HAL I2C */
+static esp_err_t tpm_register_read(uint32_t reg,
                                     uint8_t *data, size_t len)
 {
     int ret;
-//    ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
-//                                      data, len,
-//                                      I2C_READ_WAIT_TICKS);
-    ret = i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
-                                        &reg_addr, 1, /* write buffer, len */
-                                        data,     len,
-                                        I2C_READ_WAIT_TICKS);
+
+//esp_err_t i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_address,
+//                                       const uint8_t* write_buffer, size_t write_size,
+//                                       uint8_t* read_buffer, size_t read_size,
+//                                       TickType_t ticks_to_wait)
+    byte buf[1];
+    ESP_LOGI(TAG, "TPM Read init %d ", is_init_read );
+    if (is_init_read == 1) {
+        buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+        ret = i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                            buf, sizeof(buf), /* write buffer, len */
+                                            data,     len,
+                                            I2C_READ_WAIT_TICKS);
+        // is_init_read = 0;
+    }
+    else {
+        ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                          data, len,
+                                          I2C_READ_WAIT_TICKS);
+    }
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
+    }
+    else {
+        ESP_LOGI(TAG, "ERROR: i2c_master_write_read_device failed with code = %d", ret);
+        if (DELETE_I2C_ON_ERROR) {
+            i2c_master_delete();
+        }
+    }
     return ret;
 }
 
-static esp_err_t tpm_register_write(uint8_t reg_addr,
+static esp_err_t tpm_register_write(uint32_t reg_addr,
                                     uint8_t* data, size_t len)
 {
     int ret;
+    ESP_LOGI(TAG, "TPM Write init %d", is_init_read);
     ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                      data, len,
                                      I2C_WRITE_WAIT_TICKS);
+    is_init_read = 1;
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Success! tpm_register_write");
+    }
+    else {
+        ESP_LOGI(TAG, "ERROR: tpm_register_write failed with code = %d", ret);
+        if (DELETE_I2C_ON_ERROR) {
+            i2c_master_delete();
+        }
+    }
+
     return ret;
 }
 
 static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
 {
     int ret;
-    ret = tpm_register_read(TPM2_I2C_ADDR, data, len);
+    ret = tpm_register_read(reg, data, len);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Read device 0x%x success.", TPM2_I2C_ADDR);
         ret = TPM_RC_SUCCESS;
@@ -204,9 +259,9 @@ static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
 static int tpm_ifx_i2c_write(void* userCtx, word32 reg, byte* data, int len)
 {
     int ret;
-    ret = tpm_register_write(TPM2_I2C_ADDR, data, len);
+    ret = tpm_register_write(reg, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Write device 0x%x success.", TPM2_I2C_ADDR);
+        ESP_LOGI(TAG, "Write device 0x%x success 0x%x len = %d.", TPM2_I2C_ADDR, (word32)data, len);
         ret = TPM_RC_SUCCESS;
     }
     else {
@@ -220,6 +275,9 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
                             byte* buf, word16 size, void* userCtx)
 {
     int ret = TPM_RC_FAILURE;
+
+    //buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+
     if (userCtx == NULL) {
         ESP_LOGE(TAG, "userCtx cannot be null");
     }
@@ -248,6 +306,7 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
     (void)ctx;
     return ret;
 }
+
 
 #else /* SPI */
     #ifndef TPM2_SPI_HZ
