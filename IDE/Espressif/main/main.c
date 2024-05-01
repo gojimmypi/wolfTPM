@@ -42,6 +42,7 @@
 #include <wolfssl/internal.h>
 
 /* project */
+#include "native_test.h"
 #include "main.h"
 
 static const char* const TAG = "My Project";
@@ -59,7 +60,9 @@ void app_main(void)
     WOLFSSL_CTX* ctx;
     ctx = (WOLFSSL_CTX*)XMALLOC(sizeof(WOLFSSL_CTX), NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
-    ret += TPM2_Wrapper_Test(ctx);
+    char mydata[1024];
+    ret += TPM2_Native_TestArgs(mydata, 0, NULL);
+//    ret += TPM2_Wrapper_Test(ctx);
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE
     if (ret == 0) {
@@ -68,6 +71,7 @@ void app_main(void)
     else {
         ESP_LOGE(TAG, WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE("Failed!", ret));
     }
+
 #elif defined(WOLFSSL_ESPIDF_EXIT_MESSAGE)
     ESP_LOGI(TAG, WOLFSSL_ESPIDF_EXIT_MESSAGE);
 #else

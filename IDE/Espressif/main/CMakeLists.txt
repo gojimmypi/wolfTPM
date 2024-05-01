@@ -44,9 +44,9 @@ if( EXISTS "${CMAKE_HOME_DIRECTORY}/components/wolfssl/" AND EXISTS "$ENV{IDF_PA
 endif()
 
 ## register_component()
-idf_component_register(SRCS main.c wrap_test.c
-                       INCLUDE_DIRS "."
-                                    "./include")
+idf_component_register(
+                       SRCS main.c wrap_test.c native_test.c
+                       INCLUDE_DIRS "." "./include")
 
 #
 # LIBWOLFSSL_SAVE_INFO(VAR_OUPUT THIS_VAR VAR_RESULT)
