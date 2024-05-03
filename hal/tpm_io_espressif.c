@@ -54,8 +54,9 @@
  * variable includes "driver" (without quotes) for idf_component_register().
  *
  * See: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/i2c.html */
-#if ESP_IDF_VERSION_MAJOR >= 5 && ESP_IDF_VERSION_MINOR >= 3
-    #define WOLFSSL_USE_LEGACY_I2C 0
+#if ESP_IDF_VERSION_MAJOR >= 5 && ESP_IDF_VERSION_MINOR > 0
+    /* TODO we are forcing legacy mode, even though using v5.2 */
+    #define WOLFSSL_USE_LEGACY_I2C 1
 #else
     #define WOLFSSL_USE_LEGACY_I2C 1
 #endif
@@ -114,7 +115,7 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0
 
 /* Wait timeout, in millisecondss. Note: -1 means wait forever. */
-#define I2C_MASTER_TIMEOUT_MS       200000
+#define I2C_MASTER_TIMEOUT_MS       10000
 
 /* Infineon 9673 I2C at 0x2e */
 #define TPM2_INFINEON_9673_ADDR     0x2e
@@ -129,6 +130,7 @@
 #else
     #define TPM2_I2C_ADDR           TPM2_INFINEON_9673_ADDR
 #endif
+
 static int is_initialized_i2c = 0;
 static int is_init_read = 1; /* TODO is this actually helpful? */
 
@@ -190,6 +192,89 @@ static esp_err_t i2c_master_delete(void)
     return ESP_OK;
 }
 
+/* Obserfed to have a value of 180 in i2c.c, rouded up for safety */
+#define I2C_TRANS_BUF_MINIMUM_SIZE     255
+
+esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_address,
+                                       const uint8_t* write_buffer, size_t write_size,
+                                       uint8_t* read_buffer, size_t read_size,
+                                       TickType_t ticks_to_wait)
+{
+    esp_err_t err = ESP_OK;
+    uint8_t buffer[I2C_TRANS_BUF_MINIMUM_SIZE] = { 0 };
+
+    // ESP_LOGW(TAG, "Begin my_i2c_master_write_read_device");
+    i2c_cmd_handle_t handle = i2c_cmd_link_create_static(buffer, sizeof(buffer));
+    assert (handle != NULL);
+
+    /* start bit */
+    if (err == ESP_OK) {
+        err = i2c_master_start(handle);
+    }
+
+    /* Device address */
+    if (err == ESP_OK) {
+        err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_WRITE, true);
+    }
+
+    /* payload to write */
+    if (err == ESP_OK) {
+        err = i2c_master_write(handle, write_buffer, write_size, true);
+    }
+
+//    if (err == ESP_OK) {
+//        err = i2c_master_start(handle); /* start bit */
+//    }
+//
+//
+//    if (err == ESP_OK) {
+//        err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_READ, true);
+//    }
+
+//    if (err == ESP_OK) {
+//        err = i2c_master_read(handle, read_buffer, read_size, I2C_MASTER_LAST_NACK);
+//    }
+
+    if (err == ESP_OK) {
+        err = i2c_master_stop(handle);
+    }
+
+    if (err == ESP_OK) {
+        err = i2c_master_cmd_begin(i2c_num, handle, ticks_to_wait);
+    }
+
+    if (err == ESP_OK) {
+        //
+    }
+    else {
+        ESP_LOGE(TAG, "Error i2c_master_cmd_begin = %d", err);
+    }
+
+//    err = i2c_master_start(handle);
+//    if (err != ESP_OK) {
+//        goto end;
+//    }
+//
+//    err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_READ, true);
+//    if (err != ESP_OK) {
+//        goto end;
+//    }
+//
+//    err = i2c_master_read(handle, read_buffer, read_size, I2C_MASTER_LAST_NACK);
+//    if (err != ESP_OK) {
+//        goto end;
+//    }
+
+
+//     vTaskDelay(pdMS_TO_TICKS(1));
+//    i2c_master_stop(handle);
+//    err = i2c_master_cmd_begin(i2c_num, handle, ticks_to_wait);
+
+    i2c_cmd_link_delete_static(handle);
+    return err;
+}
+
+
 /* Espressif HAL I2C */
 static esp_err_t tpm_register_read(uint32_t reg,
                                     uint8_t *data, size_t len)
@@ -201,10 +286,16 @@ static esp_err_t tpm_register_read(uint32_t reg,
 //                                       uint8_t* read_buffer, size_t read_size,
 //                                       TickType_t ticks_to_wait)
     byte buf[1];
-    ESP_LOGI(TAG, "TPM Read init %d ", is_init_read );
+
+    /* TIS layer should never provide a buffer larger than this,
+     * but double check for good coding practice */
+    if (len > MAX_SPI_FRAMESIZE)
+        return BAD_FUNC_ARG;
+
+    // ESP_LOGI(TAG, "TPM Read init %d len = %d", is_init_read, len);
     if (is_init_read == 1) {
         buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
-        ret = i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+        ret = my_i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                             buf, sizeof(buf), /* write buffer, len */
                                             data,     len,
                                             I2C_READ_WAIT_TICKS);
@@ -217,8 +308,8 @@ static esp_err_t tpm_register_read(uint32_t reg,
     }
 
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
-        show_binary(data, len);
+        //ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
+        //show_binary(data, len);
     }
     else {
         if (ret == ESP_ERR_TIMEOUT) {
@@ -263,7 +354,7 @@ static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
     int ret;
     ret = tpm_register_read(reg, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Read device 0x%x success.\n", TPM2_I2C_ADDR);
+        // ESP_LOGI(TAG, "Read device 0x%x success.\n", TPM2_I2C_ADDR);
         ret = TPM_RC_SUCCESS;
     }
     else {
