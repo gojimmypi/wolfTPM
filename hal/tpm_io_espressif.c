@@ -132,8 +132,6 @@
 #endif
 
 static int is_initialized_i2c = 0;
-static int is_init_read = 1; /* TODO is this actually helpful? */
-
 
 static int show_binary(byte* theVar, size_t dataSz) {
     printf("*****************************************************\n");
@@ -200,54 +198,86 @@ esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_add
                                        uint8_t* read_buffer, size_t read_size,
                                        TickType_t ticks_to_wait)
 {
-    esp_err_t err = ESP_OK;
     uint8_t buffer[I2C_TRANS_BUF_MINIMUM_SIZE] = { 0 };
+    i2c_cmd_handle_t handle;
+    esp_err_t err = ESP_OK;
+    int timeout = 100;
+    
+/* wake up*/
+#if 0    
+    do {
 
-    // ESP_LOGW(TAG, "Begin my_i2c_master_write_read_device");
-    i2c_cmd_handle_t handle = i2c_cmd_link_create_static(buffer, sizeof(buffer));
-    assert (handle != NULL);
+        // ESP_LOGW(TAG, "Begin my_i2c_master_write_read_device");
+        handle = i2c_cmd_link_create_static(buffer, sizeof(buffer));
+        assert(handle != NULL);
 
-    /* start bit */
-    if (err == ESP_OK) {
-        err = i2c_master_start(handle);
-    }
+        /* start bit */
+        if (err == ESP_OK) {
+            err = i2c_master_start(handle);
+        }
 
-    /* Device address */
-    if (err == ESP_OK) {
-        err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_WRITE, true);
-    }
+        /* Device address */
+        if (err == ESP_OK) {
+            err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_WRITE, true);
+        }
+        if (err == ESP_OK) {
+            err = i2c_master_read(handle, read_buffer, read_size, I2C_MASTER_LAST_NACK);
+        }
+//        /* payload to write */
+//        if (err == ESP_OK) {
+//            err = i2c_master_write(handle, write_buffer, write_size, true);
+//        }
 
-    /* payload to write */
-    if (err == ESP_OK) {
-        err = i2c_master_write(handle, write_buffer, write_size, true);
-    }
+//        if (err == ESP_OK) {
+//            err = i2c_master_start(handle); /* start bit */
+//        }
+        //
+        //
+        //    if (err == ESP_OK) {
+        //        err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_READ, true);
+        //    }
 
-//    if (err == ESP_OK) {
-//        err = i2c_master_start(handle); /* start bit */
-//    }
-//
-//
-//    if (err == ESP_OK) {
-//        err = i2c_master_write_byte(handle, device_address << 1 | I2C_MASTER_READ, true);
-//    }
+        //    if (err == ESP_OK) {
+        //        err = i2c_master_read(handle, read_buffer, read_size, I2C_MASTER_LAST_NACK);
+        //    }
 
-//    if (err == ESP_OK) {
-//        err = i2c_master_read(handle, read_buffer, read_size, I2C_MASTER_LAST_NACK);
-//    }
+        if (err == ESP_OK) {
+            err = i2c_master_stop(handle);
+        }
 
-    if (err == ESP_OK) {
-        err = i2c_master_stop(handle);
-    }
+        if (err == ESP_OK) {
+            err = i2c_master_cmd_begin(i2c_num, handle, ticks_to_wait);
+        }
+        i2c_cmd_link_delete_static(handle);
 
-    if (err == ESP_OK) {
-        err = i2c_master_cmd_begin(i2c_num, handle, ticks_to_wait);
-    }
+        vTaskDelay(pdMS_TO_TICKS(1));
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "try again = %d", err);
+        }
+        else {
+            ESP_LOGE(TAG, "try again error = %d", err);
+        }
+    } while ((err != ESP_OK) && (--timeout > 0));
 
     if (err == ESP_OK) {
         //
     }
     else {
         ESP_LOGE(TAG, "Error i2c_master_cmd_begin = %d", err);
+    }
+#endif
+    
+    vTaskDelay(pdMS_TO_TICKS(1));
+//    handle = i2c_cmd_link_create_static(buffer, sizeof(buffer));
+
+    if (err == ESP_OK) {
+    err = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                          read_buffer, read_size,
+                                          I2C_READ_WAIT_TICKS);
+    }
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "crap");
     }
 
 //    err = i2c_master_start(handle);
@@ -270,7 +300,6 @@ esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_add
 //    i2c_master_stop(handle);
 //    err = i2c_master_cmd_begin(i2c_num, handle, ticks_to_wait);
 
-    i2c_cmd_link_delete_static(handle);
     return err;
 }
 
@@ -285,7 +314,6 @@ static esp_err_t tpm_register_read(uint32_t reg,
 //                                       const uint8_t* write_buffer, size_t write_size,
 //                                       uint8_t* read_buffer, size_t read_size,
 //                                       TickType_t ticks_to_wait)
-    byte buf[1];
 
     /* TIS layer should never provide a buffer larger than this,
      * but double check for good coding practice */
@@ -293,20 +321,18 @@ static esp_err_t tpm_register_read(uint32_t reg,
         return BAD_FUNC_ARG;
 
     // ESP_LOGI(TAG, "TPM Read init %d len = %d", is_init_read, len);
-    if (is_init_read == 1) {
-        buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+#if 1
+    byte buf[1];
+    buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
         ret = my_i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                             buf, sizeof(buf), /* write buffer, len */
                                             data,     len,
                                             I2C_READ_WAIT_TICKS);
-        // is_init_read = 0;
-    }
-    else {
+#else
         ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                           data, len,
                                           I2C_READ_WAIT_TICKS);
-    }
-
+#endif
     if (ret == ESP_OK) {
         //ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
         //show_binary(data, len);
@@ -329,12 +355,11 @@ static esp_err_t tpm_register_write(uint32_t reg_addr,
                                     uint8_t* data, size_t len)
 {
     int ret;
-    ESP_LOGI(TAG, "TPM Write init state = %d. Len = %d", is_init_read, len);
+    ESP_LOGI(TAG, "TPM Write Len = %d", len);
     show_binary(data, len);
     ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                      data, len,
                                      I2C_WRITE_WAIT_TICKS);
-    is_init_read = 1;
 
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Success! tpm_register_write wrote %d bytes", len);
