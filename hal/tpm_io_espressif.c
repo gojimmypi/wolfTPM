@@ -131,6 +131,10 @@
     #define TPM2_I2C_ADDR           TPM2_INFINEON_9673_ADDR
 #endif
 
+#ifndef TPM_I2C_TRIES
+    #define TPM_I2C_TRIES 10
+#endif
+
 static int is_initialized_i2c = 0;
 
 static int show_binary(byte* theVar, size_t dataSz) {
@@ -193,6 +197,11 @@ static esp_err_t i2c_master_delete(void)
 /* Obserfed to have a value of 180 in i2c.c, rouded up for safety */
 #define I2C_TRANS_BUF_MINIMUM_SIZE     255
 
+// #define USE_MY_I2C
+// #define USE_IDF_WRITE_READ
+// #define USE_IDF_READ
+
+#ifdef USE_MY_I2C
 esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_address,
                                        const uint8_t* write_buffer, size_t write_size,
                                        uint8_t* read_buffer, size_t read_size,
@@ -302,7 +311,7 @@ esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_add
 
     return err;
 }
-
+#endif /* USE_MY_I2C custom */
 
 /* Espressif HAL I2C */
 static esp_err_t tpm_register_read(uint32_t reg,
@@ -321,8 +330,6 @@ static esp_err_t tpm_register_read(uint32_t reg,
         return BAD_FUNC_ARG;
 
     // ESP_LOGI(TAG, "TPM Read init %d len = %d", is_init_read, len);
-// #define USE_MY_I2C
-#define USE_IDF_WRITE_READ
 
 #ifdef USE_MY_I2C
     byte buf[1];
@@ -339,12 +346,46 @@ static esp_err_t tpm_register_read(uint32_t reg,
                                             buf, sizeof(buf), /* write buffer, len */
                                             data,     len,
                                             I2C_READ_WAIT_TICKS);
-    #else
+    #elif defined(USE_IDF_READ)
         ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                           data, len,
                                           I2C_READ_WAIT_TICKS);
+    #else
+        byte buf[1];
+        buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+        int timeout = TPM_I2C_TRIES;
+
+        /* The I2C takes about 80us to wake up and will NAK until it is ready */
+        do {
+            /* Write address to read from - retry until ack  */
+            //ret = cyhal_i2c_master_write(i2c, TPM2_I2C_ADDR, buf, sizeof(buf),
+            //    0, true);
+            ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                     buf, sizeof(buf),
+                                     I2C_WRITE_WAIT_TICKS);
+
+            /* for read we always need this guard time (success wake or real read) */
+            XSLEEP_MS(1); /* guard time - should be 250us */
+        } while (ret != ESP_OK && --timeout > 0);
     #endif
 #endif
+
+        if (ret == ESP_OK) {
+            timeout = TPM_I2C_TRIES;
+            do {
+                //ret = cyhal_i2c_master_read(i2c, TPM2_I2C_ADDR, data, len,
+                //    0, true);
+                ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                                 data, len,
+                                                 I2C_READ_WAIT_TICKS);
+                if (ret != ESP_OK) {
+                    XSLEEP_MS(1); /* guard time - should be 250us */
+                }
+            } while (ret != ESP_OK && --timeout > 0);
+        }
+
+
+
     if (ret == ESP_OK) {
         //ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
         //show_binary(data, len);
@@ -406,7 +447,7 @@ static int tpm_ifx_i2c_write(void* userCtx, word32 reg, byte* data, int len)
     int ret;
     ret = tpm_register_write(reg, data, len);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Write device 0x%x success 0x%x len = %dn.", TPM2_I2C_ADDR, (word32)data, len);
+        ESP_LOGI(TAG, "Write device 0x%x success 0x%x len = %d\n", TPM2_I2C_ADDR, (word32)data, len);
         ret = TPM_RC_SUCCESS;
     }
     else {
