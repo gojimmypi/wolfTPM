@@ -75,7 +75,7 @@
 
 /* GPIO number used for I2C master clock */
 #ifdef CONFIG_I2C_MASTER_SCL
-    /* Yellow wire */
+    /* Yellow wire Clock */
     #define I2C_MASTER_SCL_IO           CONFIG_I2C_MASTER_SCL
 #else
     /* There should have been a Kconfig.projbuild file in the ./main
@@ -202,9 +202,9 @@ esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_add
     i2c_cmd_handle_t handle;
     esp_err_t err = ESP_OK;
     int timeout = 100;
-    
+
 /* wake up*/
-#if 0    
+#if 0
     do {
 
         // ESP_LOGW(TAG, "Begin my_i2c_master_write_read_device");
@@ -266,7 +266,7 @@ esp_err_t my_i2c_master_write_read_device(i2c_port_t i2c_num, uint8_t device_add
         ESP_LOGE(TAG, "Error i2c_master_cmd_begin = %d", err);
     }
 #endif
-    
+
     vTaskDelay(pdMS_TO_TICKS(1));
 //    handle = i2c_cmd_link_create_static(buffer, sizeof(buffer));
 
@@ -321,7 +321,10 @@ static esp_err_t tpm_register_read(uint32_t reg,
         return BAD_FUNC_ARG;
 
     // ESP_LOGI(TAG, "TPM Read init %d len = %d", is_init_read, len);
-#if 1
+// #define USE_MY_I2C
+#define USE_IDF_WRITE_READ
+
+#ifdef USE_MY_I2C
     byte buf[1];
     buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
         ret = my_i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
@@ -329,9 +332,18 @@ static esp_err_t tpm_register_read(uint32_t reg,
                                             data,     len,
                                             I2C_READ_WAIT_TICKS);
 #else
+    #ifdef USE_IDF_WRITE_READ
+        byte buf[1];
+        buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+        ret = i2c_master_write_read_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                            buf, sizeof(buf), /* write buffer, len */
+                                            data,     len,
+                                            I2C_READ_WAIT_TICKS);
+    #else
         ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                           data, len,
                                           I2C_READ_WAIT_TICKS);
+    #endif
 #endif
     if (ret == ESP_OK) {
         //ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
