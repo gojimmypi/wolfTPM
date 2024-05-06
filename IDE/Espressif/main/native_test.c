@@ -1477,9 +1477,23 @@ exit:
 
     /* Shutdown */
     cmdIn.shutdown.shutdownType = TPM_SU_CLEAR;
+#if 0
+    if (rc == TPM_RC_SUCCESS) {
+        printf("TPM2_Shutdown...\n");
+        rc = TPM2_Shutdown(&cmdIn.shutdown);
+        if (rc != TPM_RC_SUCCESS) {
+            printf("TPM2_Shutdown failed\n");
+        }
+    }
+    else {
+        printf("TPM2_Shutdown skipped with prior error = %d \n", rc);
+    }
+#else
     if (TPM2_Shutdown(&cmdIn.shutdown) != TPM_RC_SUCCESS) {
         printf("TPM2_Shutdown failed\n");
     }
+
+#endif
 
     TPM2_Cleanup(&tpm2Ctx);
 
