@@ -404,27 +404,53 @@ static esp_err_t tpm_register_read(uint32_t reg,
     return ret;
 }
 
-static esp_err_t tpm_register_write(uint32_t reg_addr,
+static esp_err_t tpm_register_write(uint32_t reg,
                                     uint8_t* data, size_t len)
 {
-    int ret;
+    int result = ESP_FAIL;
+    int timeout = TPM_I2C_TRIES;
+    byte buf[MAX_SPI_FRAMESIZE+1];
+
+    /* TIS layer should never provide a buffer larger than this,
+        * but double check for good coding practice */
+    if (len > MAX_SPI_FRAMESIZE)
+        return BAD_FUNC_ARG;
+
+    /* Build packet with TPM register and data */
+    buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
+    XMEMCPY(buf + 1, data, len);
+
+
     ESP_LOGI(TAG, "TPM Write Len = %d", len);
     show_binary(data, len);
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
-                                     data, len,
-                                     I2C_WRITE_WAIT_TICKS);
 
-    if (ret == ESP_OK) {
+        /* The I2C takes about 80us to wake up and will NAK until it is ready */
+        do {
+//            result = cyhal_i2c_master_write(i2c, TPM2_I2C_ADDR, buf, len+1,
+//                0, true);
+            result = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+                                     buf, len + 1,
+                                     I2C_WRITE_WAIT_TICKS);
+            if (result != ESP_OK) {
+                XSLEEP_MS(1); /* guard time - should be 250us */
+            }
+        } while (result != ESP_OK && --timeout > 0);
+
+//    ret = i2c_master_write_to_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
+//                                     data, len,
+//                                     I2C_WRITE_WAIT_TICKS);
+
+    if (result == ESP_OK) {
         ESP_LOGI(TAG, "Success! tpm_register_write wrote %d bytes", len);
     }
     else {
-        ESP_LOGI(TAG, "ERROR: tpm_register_write failed with code = %d", ret);
+        ESP_LOGI(TAG, "ERROR: tpm_register_write failed with code = %d", result);
         if (DELETE_I2C_ON_ERROR) {
             i2c_master_delete();
         }
     }
 
-    return ret;
+    return result;
 }
 
 static int tpm_ifx_i2c_read(void* userCtx, word32 reg, byte* data, int len)
