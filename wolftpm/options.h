@@ -39,7 +39,7 @@
 #define WOLFTPM_INCLUDE_IO_FILE
 
 /* The default TPM_TIMEOUT_TRIES is 1,000,000 but can be overridden: */
-#define TPM_TIMEOUT_TRIES 100
+#define TPM_TIMEOUT_TRIES 10000
 
 #define NO_MAIN_DRIVER
 
