@@ -28,34 +28,52 @@
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
 
-/* Choices are I2C or TPI*/
+/* Choices are I2C or SPI*/
+/* WOLFTPM_I2C or not; when not defined, assumes SPI. */
 #define WOLFTPM_I2C
 
 /* Enable the wolfTPM example HAL in tpm_io.h */
 #define WOLFTPM_EXAMPLE_HAL
 
-// #define WOLFSSL_STM32_CUBEMX
-
+/* Include the respective hal/tmp_io_NNN file, in our case: tpm_io_espressif */
 #define WOLFTPM_INCLUDE_IO_FILE
 
-/* The default TPM_TIMEOUT_TRIES is 1,000,000 but can be overridden: */
+/* The default TPM_TIMEOUT_TRIES is 1,000,000 but can be overridden.
+ * A value of 10000 is much more appropriate for the ESP32: */
 #define TPM_TIMEOUT_TRIES 10000
 
+/* If not defined here, TPM_I2C_TRIES is set to a default value of 10 */
+/* TPM_I2C_TRIES 10 */
+
+/* Examples may have a main() function, we'll have oour own: */
 #define NO_MAIN_DRIVER
 
+/* I2C_MASTER_FREQ_HZ notes:
+ *
+ * Although the Infineon supports higher speeds, the ESP32 does not.
+ *
+ * ESP32 supports both I2C Standard-mode (Sm) and Fast-mode (Fm) which
+ * can go up to 100KHz and 400KHz respectively.
+ *
+ * Do not set this value higher than 400000.
+ *
+ * This is the value assigned to ESP32 i2c_config_t: master.clk_speed */
 #define I2C_MASTER_FREQ_HZ 100000
 
-// #define WOLFTPM_DEBUG_IO
+/* Beware that delays in sending data to UART may affect I2C timing and
+ * cause errors. Debug with caution. Debug options available: */
+/* #define WOLFTPM_DEBUG_IO */
+
 
 // #define WOLFSSL_NOPRINTF
 
 // #define XPRINTF
 
-#ifdef WOLFSSL_ESPIDFx
+#ifdef WOLFSSL_ESPIDF
     #include <esp_log.h>
     #define  ESP_LOG_TAG  "tpm2_tis"
     #ifndef WOLFSSL_NOPRINTF
-        static void do_pause()
+         __attribute__((unused)) static void do_pause()
         {
             ESP_LOGI(ESP_LOG_TAG, "pause");
         }

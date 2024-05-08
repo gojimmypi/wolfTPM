@@ -509,7 +509,9 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
 
         xferSz = packet->pos - pos;
         if (xferSz > burstCount) {
+            #if 0
             printf("xferSz %d exceeded to burstCount %d\n", xferSz, burstCount);
+            #endif
             xferSz = burstCount;
         }
 
