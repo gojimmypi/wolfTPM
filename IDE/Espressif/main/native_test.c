@@ -522,7 +522,6 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         goto exit;
     }
     /* This is a fairly long-running test: */
-    XSLEEP_MS(10);
     rc = TPM2_StartAuthSession(&cmdIn.authSes, &cmdOut.authSes);
     if (rc != TPM_RC_SUCCESS) {
         printf_error("TPM2_StartAuthSession failed 0x%x: %s\n", rc,
@@ -741,7 +740,6 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     cmdIn.createPri.inPublic.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM_ALG_AES;
     cmdIn.createPri.inPublic.publicArea.parameters.rsaDetail.symmetric.keyBits.aes = 128;
     cmdIn.createPri.inPublic.publicArea.parameters.rsaDetail.symmetric.mode.aes = TPM_ALG_CFB;
-    vTaskDelay(1000);
     rc = TPM2_CreatePrimary(&cmdIn.createPri, &cmdOut.createPri);
     if (rc != TPM_RC_SUCCESS) {
         printf_error("TPM2_CreatePrimary: Storage failed 0x%x: %s\n", rc,
@@ -930,7 +928,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf_error("TPM2_ObjectChangeAuth failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        //goto exit;
+        goto exit;
     }
     hmacKey.priv = cmdOut.objChgAuth.outPrivate;
     printf("TPM2_ObjectChangeAuth: private %d\n", hmacKey.priv.size);
