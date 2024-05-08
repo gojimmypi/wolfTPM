@@ -40,6 +40,7 @@
 
 
 #include <wolftpm/options.h>
+#include <wolftpm/version.h>
 // #include "wolftpm_test.h"
 
 #include <wolfssl/internal.h>
@@ -59,7 +60,12 @@ extern int TPM2_Wrapper_Test(void* userCtx);
 void app_main(void)
 {
     int ret = 0;
+
+#ifdef LIBWOLFTPM_VERSION_STRING
+    ESP_LOGI(TAG, "Hello wolfTPM version %s!", LIBWOLFTPM_VERSION_STRING);
+#else
     ESP_LOGI(TAG, "Hello wolfTPM!");
+#endif
 
 #ifdef HAVE_VERSION_EXTENDED_INFO
     ret = esp_ShowExtendedSystemInfo();
