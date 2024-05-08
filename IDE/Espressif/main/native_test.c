@@ -1512,9 +1512,6 @@ exit:
         close(gSpiDev);
 #endif
 
-    if (rc != TPM_RC_SUCCESS) {
-        printf("Tests failed, error = %d", rc);
-    }
     return rc;
 }
 
