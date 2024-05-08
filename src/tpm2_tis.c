@@ -183,14 +183,14 @@ enum tpm_tis_status {
 //            ESP_LOGI(TAG, "pause");
 //        }
 //        #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
-//        #define printf_error(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
+//        #define printf(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
 //    #else
 //        #define printf(...) {}
-//        #define printf_error(...) {}
+//        #define printf(...) {}
 //    #endif
 //#else
 //    #include <stdio.h>
-//    #define printf_error(...) printf(__VA_ARGS__)
+//    #define printf(...) printf(__VA_ARGS__)
 //#endif
 int TPM2_TIS_Read(TPM2_CTX* ctx, word32 addr, byte* result,
     word32 len)
@@ -477,15 +477,15 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
     /* Make sure TPM is ready for command */
     rc = TPM2_TIS_Status(ctx, &status);
     if (rc != TPM_RC_SUCCESS) {
-        printf_error("TPM2_TIS_Status failed!\n");
-        goto exit;
+        printf("TPM2_TIS_Status failed!\n");
+        ERROR_OUT(rc, exit);
     }
     if ((status & TPM_STS_COMMAND_READY) == 0) {
         /* Tell TPM chip to expect a command */
         rc = TPM2_TIS_Ready(ctx);
         if (rc != TPM_RC_SUCCESS) {
-            printf_error("TPM2_TIS_Ready failed!\n");
-            goto exit;
+            printf("TPM2_TIS_Ready failed!\n");
+            ERROR_OUT(rc, exit);
         }
         ESP_LOGW("tpm2_tis", "Waiting...");
         /* Wait for command ready (TPM_STS_COMMAND_READY = 1) */
@@ -493,8 +493,8 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
                                          TPM_STS_COMMAND_READY);
         ESP_LOGW("tpm2_tis", "Continue...");
         if (rc != TPM_RC_SUCCESS) {
-            printf_error("TPM2_TIS_WaitForStatus failed!\n");
-            goto exit;
+            printf("TPM2_TIS_WaitForStatus failed!\n");
+            ERROR_OUT(rc, exit);
         }
     } /* TPM_STS_COMMAND_READY */
 
@@ -503,8 +503,8 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
     while (pos < packet->pos) {
         rc = TPM2_TIS_GetBurstCount(ctx, &burstCount);
         if (rc < 0) {
-            printf_error("TPM2_TIS_GetBurstCount failed!\n");
-            goto exit;
+            printf("TPM2_TIS_GetBurstCount failed!\n");
+            ERROR_OUT(rc, exit);
         }
 
         xferSz = packet->pos - pos;
@@ -518,8 +518,8 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
         rc = TPM2_TIS_Write(ctx, TPM_DATA_FIFO(ctx->locality), &packet->buf[pos],
                                xferSz);
         if (rc != TPM_RC_SUCCESS) {
-            printf_error("TPM2_TIS_Write failed!\n");
-            goto exit;
+            printf("TPM2_TIS_Write failed!\n");
+            ERROR_OUT(rc, exit);
         }
         pos += xferSz;
 
@@ -532,7 +532,7 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
                 printf("TPM2_TIS_SendCommand write expected more data!\n");
             #endif
                 printf("TPM2_TIS_SendCommand write expected more data!\n");
-                goto exit;
+                ERROR_OUT(rc, exit);
             }
         }
     }
@@ -549,7 +549,7 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
             printf("TPM2_TIS_SendCommand status valid timeout!\n");
         #endif
             printf("TPM2_TIS_SendCommand status valid timeout!\n");
-            goto exit;
+            ERROR_OUT(rc, exit);
         }
     }
 
@@ -558,8 +558,8 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
     rc = TPM2_TIS_Write(ctx, TPM_STS(ctx->locality), &access,
                            sizeof(access));
     if (rc != TPM_RC_SUCCESS) {
-        printf_error("TPM2_TIS_Write failed!\n");
-        goto exit;
+        printf("TPM2_TIS_Write failed!\n");
+        ERROR_OUT(rc, exit);
     }
 
     /* Read response */
@@ -572,14 +572,14 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
         if (rc != TPM_RC_SUCCESS) {
         #ifdef DEBUG_WOLFTPM
         #endif
-            printf_error("TPM2_TIS_SendCommand read no data available!\n");
-            goto exit;
+            printf("TPM2_TIS_SendCommand read no data available!\n");
+            ERROR_OUT(rc, exit);
         }
 
         rc = TPM2_TIS_GetBurstCount(ctx, &burstCount);
         if (rc < 0) {
-            printf_error("TPM2_TIS_GetBurstCount failed!\n");
-            goto exit;
+            printf("TPM2_TIS_GetBurstCount failed!\n");
+            ERROR_OUT(rc, exit);
         }
 
         xferSz = rspSz - pos;
@@ -589,8 +589,8 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
         rc = TPM2_TIS_Read(ctx, TPM_DATA_FIFO(ctx->locality), &packet->buf[pos],
                               xferSz);
         if (rc != TPM_RC_SUCCESS) {
-            printf_error("TPM2_TIS_Read failed!\n");
-            goto exit;
+            printf("TPM2_TIS_Read failed!\n");
+            ERROR_OUT(rc, exit);
         }
 
         pos += xferSz;
@@ -604,9 +604,9 @@ int TPM2_TIS_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
 
             /* safety check for stuck FFFF case */
             if (rspSz < 0 || rspSz >= MAX_RESPONSE_SIZE || rspSz > packet->size) {
-                printf_error("TPM2_Packet_SwapU32 failed!\n");
+                printf("TPM2_Packet_SwapU32 failed!\n");
                 rc = TPM_RC_FAILURE;
-                goto exit;
+                ERROR_OUT(rc, exit);
             }
         } /* pos == TPM2_HEADER_SIZE */
     } /* while (pos < rspSz) */
@@ -627,7 +627,7 @@ exit:
         rc = TPM2_TIS_Ready(ctx);
 
         if (rc != TPM_RC_SUCCESS) {
-            printf_error("TPM2_TIS_Ready failed!\n");
+            printf("TPM2_TIS_Ready failed!\n");
         }
     }
 

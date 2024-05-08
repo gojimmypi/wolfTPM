@@ -46,37 +46,7 @@
 //    #define printf(...) printf(__VA_ARGS__)
 //#endif
 
-/* If not defined in user_settings, the ERROR_OUT pause is 120 seconds. */
-#ifndef WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION
-    #define WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION 120
-#endif
-#if defined(WOLFSSL_ESPIDF_ERROR_PAUSE)
-    #define ESPIDF_TAG "native_test"
-    #if defined(CONFIG_FREERTOS_HZ)
-        #define WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION_TICKS \
-           (WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION * CONFIG_FREERTOS_HZ)
-    #else
-        /* If not defined, assume RTOS is 1000 ticks per second. */
-        #define WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION_TICKS \
-           (WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION * 1000)
-    #endif
-    /* When defined, pause at error condition rather than exit with error. */
-    #define ERROR_OUT(err, eLabel) \
-        do { \
-            rc = (err); \
-            ESP_LOGE(ESPIDF_TAG, "Failed: Error = %d during %s, line %d", \
-                                    err, __FUNCTION__, __LINE__); \
-            ESP_LOGI(ESPIDF_TAG, "Extended system info:"); \
-            esp_ShowExtendedSystemInfo(); \
-            ESP_LOGW(ESPIDF_TAG, "Paused for %d seconds! " \
-                                 "WOLFSSL_ESPIDF_ERROR_PAUSE is enabled.", \
-                                  WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION); \
-            vTaskDelay(WOLFSSL_ESPIDF_ERROR_PAUSE_DURATION_TICKS); \
-            goto eLabel; \
-        } while (0)
-#else
-    #define ERROR_OUT(err, eLabel) do { ret = (err); goto eLabel; } while (0)
-#endif
+
 
 /******************************************************************************/
 /* --- BEGIN TPM Native API Tests -- */
@@ -1523,27 +1493,16 @@ exit:
 
     /* Shutdown */
     cmdIn.shutdown.shutdownType = TPM_SU_CLEAR;
-#if 0
+
+    printf("Begin TPM2 shutdown process...\n");
+    rc = TPM2_Shutdown(&cmdIn.shutdown);
     if (rc == TPM_RC_SUCCESS) {
-        printf("TPM2_Shutdown...\n");
-        rc = TPM2_Shutdown(&cmdIn.shutdown);
-        if (rc != TPM_RC_SUCCESS) {
-            printf("TPM2_Shutdown failed\n");
-        }
-    }
-    else {
-        printf("TPM2_Shutdown skipped with prior error = %d \n", rc);
-    }
-#else
-    printf("Begin shutdown...\n");
-    if (TPM2_Shutdown(&cmdIn.shutdown) == TPM_RC_SUCCESS) {
         printf("TPM2_Shutdown success\n");
     }
     else {
-        printf("TPM2_Shutdown failed\n");
+        printf("TPM2_Shutdown failed,failed 0x%x: %s\n", rc,
+               TPM2_GetRCString(rc));
     }
-
-#endif
 
     TPM2_Cleanup(&tpm2Ctx);
 

@@ -458,15 +458,16 @@ static TPM_RC TPM2_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
     /* submit command and wait for response */
     rc = (TPM_RC)INTERNAL_SEND_COMMAND(ctx, packet);
     if (rc != 0) {
-        printf_error("TPM2_SendCommand failed.");
+        printf("TPM2_SendCommand failed.");
         return rc;
     }
     rc = TPM2_Packet_Parse(rc, packet);
     if ((rc != TPM_RC_SUCCESS) && (rc != TPM_RC_INITIALIZE)) {
-        printf_error("TPM2_SendCommand success, but TPM2_Packet_Parse failed with error = %lu. TPM_RC_INITIALIZE = %d", rc, TPM_RC_INITIALIZE);
+        printf("TPM2_SendCommand success, but TPM2_Packet_Parse failed with error = %lu. TPM_RC_INITIALIZE = %d", rc, TPM_RC_INITIALIZE);
+        goto exit;
         return rc;
     }
-
+exit:
     return rc;
 }
 
@@ -1405,7 +1406,7 @@ TPM_RC TPM2_StartAuthSession(StartAuthSession_In* in, StartAuthSession_Out* out)
         else {
         #ifdef DEBUG_WOLFTPM
         #endif
-            printf_error("TPM2_StartAuthSession failed during TPM2_SendCommand "
+            printf("TPM2_StartAuthSession failed during TPM2_SendCommand "
                    "Error code = %lu!\n", rc);
         }
 
