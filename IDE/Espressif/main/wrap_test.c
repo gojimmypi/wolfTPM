@@ -28,8 +28,14 @@
 
 #include <wolftpm/tpm2.h>
 #include <wolftpm/tpm2_wrap.h>
-
-#include <stdio.h>
+//
+//#ifdef WOLFSSL_ESPIDF
+//    #include <esp_log.h>
+//    const char* TAG = "native_Test";
+//    #define printf(...) ESP_LOGI(TAG, __VA_ARGS__)
+//#else
+//    #include <stdio.h>
+//#endif
 
 #ifndef WOLFTPM2_NO_WRAPPER
 

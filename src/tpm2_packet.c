@@ -138,10 +138,18 @@ void TPM2_Packet_ParseU32(TPM2_Packet* packet, UINT32* data)
             XMEMCPY(&value, &packet->buf[packet->pos], sizeof(UINT32));
             value = be32_to_cpu(value);
         }
+//        else {
+//            printf("set to zero?");
+//            XMEMSET(&value, (UINT32)0, sizeof(UINT32));
+//        }
         packet->pos += sizeof(UINT32);
     }
-    if (data)
+    if (data) {
         *data = value;
+    }
+    else {
+        printf("no data?");
+    }
 }
 
 void TPM2_Packet_AppendU64(TPM2_Packet* packet, UINT64 data)

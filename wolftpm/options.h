@@ -47,3 +47,25 @@
 
 // #define WOLFTPM_DEBUG_IO
 
+// #define WOLFSSL_NOPRINTF
+
+// #define XPRINTF
+
+#ifdef WOLFSSL_ESPIDFx
+    #include <esp_log.h>
+    #define  ESP_LOG_TAG  "tpm2_tis"
+    #ifndef WOLFSSL_NOPRINTF
+        static void do_pause()
+        {
+            ESP_LOGI(ESP_LOG_TAG, "pause");
+        }
+        #define XPRINTF(...)         ESP_LOGI("tpm", __VA_ARGS__)
+        #define printf_error(...) do { ESP_LOGE("tpm", __VA_ARGS__); do_pause(); } while(0)
+    #else
+        #define printf(...) {}
+        #define printf_error(...) {}
+    #endif
+#else
+    #include <stdio.h>
+    #define printf_error(...) printf(__VA_ARGS__)
+#endif

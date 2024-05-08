@@ -115,7 +115,7 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0
 
 /* Wait timeout, in millisecondss. Note: -1 means wait forever. */
-#define I2C_MASTER_TIMEOUT_MS       10000
+#define I2C_MASTER_TIMEOUT_MS       25000
 
 /* Infineon 9673 I2C at 0x2e */
 #define TPM2_INFINEON_9673_ADDR     0x2e
@@ -364,27 +364,32 @@ static esp_err_t esp_tpm_register_read(uint32_t reg, uint8_t *data, size_t len)
 
             /* For read we always need this guard time.
              * (success wake or real read) */
-            XSLEEP_MS(1); /* guard time - should be 250us */
+            if (ret != ESP_OK) {
+                XSLEEP_MS(2);
+            }
         } while (ret != ESP_OK && --timeout > 0);
+        XSLEEP_MS(1); /* guard time - should be 250us */
     #endif
 #endif
-
+        int loops = 0;
         if (ret == ESP_OK) {
             timeout = TPM_I2C_TRIES;
             do {
+                loops++;
                 ret = i2c_master_read_from_device(I2C_MASTER_NUM, TPM2_I2C_ADDR,
                                                  data, len,
                                                  I2C_READ_WAIT_TICKS);
                 if (ret != ESP_OK) {
-                    XSLEEP_MS(1); /* guard time - should be 250us */
+                    XSLEEP_MS(5 + loops);
                 }
             } while (ret != ESP_OK && --timeout > 0);
         }
+        XSLEEP_MS(1); /* guard time - should be 250us */
 
     if (ret == ESP_OK) {
-#ifdef DEBUG_WOLFSSL_VERBOSE
-        ESP_LOGI(TAG, "Success! i2c_master_write_read_device");
+        ESP_LOGI(TAG, "Success! i2c_master_read_from_device. loops = %d", loops);
         show_binary(data, len);
+#ifdef DEBUG_WOLFSSL_VERBOSE
 #endif
     }
     else {
@@ -428,9 +433,10 @@ static esp_err_t esp_tpm_register_write(uint32_t reg,
                                             buf, len + 1,
                                             I2C_WRITE_WAIT_TICKS);
         if (result != ESP_OK) {
-            XSLEEP_MS(1); /* guard time - should be 250us */
+            XSLEEP_MS(2); /* guard time - should be 250us */
         }
     } while (result != ESP_OK && --timeout > 0);
+    XSLEEP_MS(1); /* guard time - should be 250us */
 
     if (result == ESP_OK) {
         ESP_LOGI(TAG, "Success! tpm_register_write wrote %d bytes", len);

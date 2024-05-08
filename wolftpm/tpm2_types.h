@@ -113,7 +113,13 @@ typedef int64_t  INT64;
     #endif
 
     #ifdef DEBUG_WOLFTPM
-        #include <stdio.h>
+        #ifdef WOLFSSL_ESPIDF
+            #include <esp_log.h>
+            const char* TAG = "native_Test";
+            #define printf(...) ESP_LOGI(TAG, __VA_ARGS__)
+        #else
+            #include <stdio.h>
+        #endif
     #endif
 
     #include <wolfssl/version.h>
@@ -124,10 +130,19 @@ typedef int64_t  INT64;
 
     #define ENCODING_TYPE_PEM  1 /* CTC_FILETYPE_PEM */
     #define ENCODING_TYPE_ASN1 2 /* CTC_FILETYPE_ASN1 */
+    /* end !WOLFTPM2_NO_WOLFCRYPT */
 
 #else
+    /* wolfTPM is not using wolfCrypt */
 
-    #include <stdio.h>
+    #ifdef WOLFSSL_ESPIDF
+        #include <esp_log.h>
+        const char* TAG = "native_Test";
+        #define printf(...) ESP_LOGI(TAG, __VA_ARGS__)
+    #else
+        #include <stdio.h>
+    #endif
+
     #include <stdlib.h>
     #include <string.h>
 
@@ -243,6 +258,25 @@ typedef int64_t  INT64;
 #ifdef XPRINTF
     #undef  printf
     #define printf XPRINTF
+#elif defined(WOLFSSL_ESPIDF)
+    #ifdef WOLFSSL_ESPIDF
+        #include <esp_log.h>
+        #define  ESP_LOG_TAG  "tpm2_tis"
+        #ifndef WOLFSSL_NOPRINTF
+            static void do_pause()
+            {
+                ESP_LOGI(ESP_LOG_TAG, "pause");
+            }
+            #define XPRINTF(...)         ESP_LOGI("tpm", __VA_ARGS__)
+            #define printf_error(...) do { ESP_LOGE("tpm", __VA_ARGS__); do_pause(); } while(0)
+        #else
+            #define printf(...) {}
+            #define printf_error(...) {}
+        #endif
+    #else
+        #include <stdio.h>
+        #define printf_error(...) printf(__VA_ARGS__)
+    #endif
 #endif
 
 /* check if locking / mutex should be enabled */
@@ -444,7 +478,11 @@ typedef int64_t  INT64;
     #endif
 #endif
 #ifndef XTPM_WAIT
-    #define XTPM_WAIT() /* just poll without delay by default */
+    #ifdef WOLFSSL_ESPIDF
+        #define XTPM_WAIT() vTaskDelay(1)
+    #else
+        #define XTPM_WAIT() /* just poll without delay by default */
+    #endif
 #endif
 
 /* sleep helper, used in firmware update */

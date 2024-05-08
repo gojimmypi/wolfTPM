@@ -33,6 +33,25 @@
 
 #include <hal/tpm_io.h>
 
+//#ifdef WOLFSSL_ESPIDF
+//    #include <esp_log.h>
+//    const char* ESP_LOG_TAG = "tpm2";
+//    #ifndef WOLFSSL_NOPRINTF
+//        void do_pause()
+//        {
+//            ESP_LOGI(TAG, "pause");
+//        }
+//        #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
+//        #define printf_error(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
+//    #else
+//        #define printf(...) {}
+//        #define printf_error(...) {}
+//    #endif
+//
+//#else
+//    #include <stdio.h>
+//    #define printf_error(...) printf(__VA_ARGS__)
+//#endif
 /******************************************************************************/
 /* --- Local Variables -- */
 /******************************************************************************/
@@ -438,10 +457,17 @@ static TPM_RC TPM2_SendCommand(TPM2_CTX* ctx, TPM2_Packet* packet)
 
     /* submit command and wait for response */
     rc = (TPM_RC)INTERNAL_SEND_COMMAND(ctx, packet);
-    if (rc != 0)
+    if (rc != 0) {
+        printf_error("TPM2_SendCommand failed.");
         return rc;
+    }
+    rc = TPM2_Packet_Parse(rc, packet);
+    if ((rc != TPM_RC_SUCCESS) && (rc != TPM_RC_INITIALIZE)) {
+        printf_error("TPM2_SendCommand success, but TPM2_Packet_Parse failed with error = %lu. TPM_RC_INITIALIZE = %d", rc, TPM_RC_INITIALIZE);
+        return rc;
+    }
 
-    return TPM2_Packet_Parse(rc, packet);
+    return rc;
 }
 
 #ifndef WOLFTPM2_NO_WOLFCRYPT
@@ -1220,20 +1246,23 @@ TPM_RC TPM2_CreatePrimary(CreatePrimary_In* in, CreatePrimary_Out* out)
                 out->creationData.creationData.outsideInfo.size);
 
             TPM2_Packet_ParseU16(&packet, &out->creationHash.size);
-            TPM2_Packet_ParseBytes(&packet, out->creationHash.buffer,
+            TPM2_Packet_ParseBytes(&packet,
+                out->creationHash.buffer,
                 out->creationHash.size);
 
             TPM2_Packet_ParseU16(&packet, &out->creationTicket.tag);
             TPM2_Packet_ParseU32(&packet, &out->creationTicket.hierarchy);
             TPM2_Packet_ParseU16(&packet, &out->creationTicket.digest.size);
             TPM2_Packet_ParseBytes(&packet,
-                        out->creationTicket.digest.buffer,
-                        out->creationTicket.digest.size);
+                out->creationTicket.digest.buffer,
+                out->creationTicket.digest.size);
 
             TPM2_Packet_ParseU16(&packet, &out->name.size);
             TPM2_Packet_ParseBytes(&packet, out->name.name, out->name.size);
         }
-
+        else {
+            ESP_LOGE("tpm2", "Error: TPM2_SendCommandAuth");
+        }
         TPM2_ReleaseLock(ctx);
     }
     return rc;
@@ -1372,6 +1401,12 @@ TPM_RC TPM2_StartAuthSession(StartAuthSession_In* in, StartAuthSession_Out* out)
             TPM2_Packet_ParseU16(&packet, &out->nonceTPM.size);
             TPM2_Packet_ParseBytes(&packet, out->nonceTPM.buffer,
                 out->nonceTPM.size);
+        }
+        else {
+        #ifdef DEBUG_WOLFTPM
+        #endif
+            printf_error("TPM2_StartAuthSession failed during TPM2_SendCommand "
+                   "Error code = %lu!\n", rc);
         }
 
         TPM2_ReleaseLock(ctx);

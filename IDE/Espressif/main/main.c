@@ -45,7 +45,7 @@
 #include "native_test.h"
 #include "main.h"
 
-static const char* const TAG = "My Project";
+static const char* const TAG = "wolfTPM main";
 
 extern int TPM2_Wrapper_Test(void* userCtx);
 
@@ -61,7 +61,14 @@ void app_main(void)
     ctx = (WOLFSSL_CTX*)XMALLOC(sizeof(WOLFSSL_CTX), NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
     char mydata[1024];
-    ret += TPM2_Native_TestArgs(mydata, 0, NULL);
+    int tests = 100;
+    do {
+        ret += TPM2_Native_TestArgs(mydata, 0, NULL);
+        vTaskDelay(5550);
+        ESP_LOGW(TAG, "*****************************************************************************");
+        ESP_LOGW(TAG, "\n\nTest #%d\n\n", tests);
+        ESP_LOGW(TAG, "*****************************************************************************");
+    } while (ret == 0 && (--tests > 0));
 //    ret += TPM2_Wrapper_Test(ctx);
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE
