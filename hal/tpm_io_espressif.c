@@ -125,6 +125,24 @@
 
 #define DELETE_I2C_ON_ERROR         0
 
+/* Number of milliseconds to wait between write and read,
+ * used in esp_tpm_register_read() */
+#define WRITE_TO_READ_GUARD_TIME    2
+
+/* Number of milliseconds to wait after read.
+ * used in esp_tpm_register_read() */
+#define POST_READ_GUARD_TIME        2
+
+/* Number of milliseconds to wait after standard write.
+ * (see also write-then-read in esp_tpm_register_read, above) */
+#define POST_WRITE_GUARD_TIME       2
+
+/* Number of milliseconds to wait after read failure. */
+#define READ_RETRY_DELAY_TIME       2
+
+/* Number of milliseconds to wait after write failure. */
+#define WRITE_RETRY_DELAY_TIME      2
+
 #if 0
     #define TPM2_I2C_ADDR           LM75_SENSOR_ADDR
 #else
@@ -242,7 +260,7 @@ static esp_err_t esp_tpm_register_read(uint32_t reg, uint8_t *data, size_t len)
     } while (ret != ESP_OK && --timeout > 0);
     /* For read we always need this guard time.
      * (success wake or real read) */
-    XSLEEP_MS(1); /* guard time - should be 250us */
+    XSLEEP_MS(WRITE_TO_READ_GUARD_TIME); /* guard time - should be min 250us */
 
     int loops = 0;
     if (ret == ESP_OK) {
@@ -256,11 +274,11 @@ static esp_err_t esp_tpm_register_read(uint32_t reg, uint8_t *data, size_t len)
                 /* If we're not immediately successful, this may be a
                     * long-running trasaction. Thus wait an increasingly
                     * longer amount of time for each retry. */
-                XSLEEP_MS(5 + (loops * 4));
+                XSLEEP_MS(READ_RETRY_DELAY_TIME + (loops * 4));
             }
         } while ((ret != ESP_OK) && (--timeout > 0));
     }
-    XSLEEP_MS(1); /* guard time - should be 250us */
+    XSLEEP_MS(POST_READ_GUARD_TIME); /* guard time - should be 250us */
 
     if (ret == ESP_OK) {
 #ifdef DEBUG_WOLFSSL_VERBOSE
@@ -311,17 +329,17 @@ static esp_err_t esp_tpm_register_write(uint32_t reg,
                                             buf, len + 1,
                                             I2C_WRITE_WAIT_TICKS);
         if (result != ESP_OK) {
-            XSLEEP_MS(2);
+            XSLEEP_MS(WRITE_RETRY_DELAY_TIME);
         }
     } while (result != ESP_OK && --timeout > 0);
-    XSLEEP_MS(1); /* guard time - should be 250us */
+    XSLEEP_MS(POST_WRITE_GUARD_TIME); /* guard time - should be 250us */
 
     if (result == ESP_OK) {
         ESP_LOGV(TAG, "Success! tpm_register_write wrote %d bytes after "
                       "%d attempts", len, (TPM_I2C_TRIES - timeout));
     }
     else {
-        ESP_LOGI(TAG, "ERROR: tpm_register_write failed with code = %d after "
+        ESP_LOGE(TAG, "ERROR: tpm_register_write failed with code = %d after "
                       "%d attempts", result, (TPM_I2C_TRIES - timeout));
         if (DELETE_I2C_ON_ERROR) {
             i2c_master_delete();
