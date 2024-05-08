@@ -37,6 +37,9 @@
     #error "Missing WOLFSSL_USER_SETTINGS in CMakeLists or Makefile:\
     CFLAGS +=-DWOLFSSL_USER_SETTINGS"
 #endif
+
+
+#include <wolftpm/options.h>
 // #include "wolftpm_test.h"
 
 #include <wolfssl/internal.h>
@@ -44,6 +47,10 @@
 /* project */
 #include "native_test.h"
 #include "main.h"
+
+#ifndef WOLFTPM_MAIN_TEST_ITERATIONS
+    #define WOLFTPM_MAIN_TEST_ITERATIONS 1
+#endif
 
 static const char* const TAG = "wolfTPM main";
 
@@ -57,18 +64,21 @@ void app_main(void)
 #ifdef HAVE_VERSION_EXTENDED_INFO
     ret = esp_ShowExtendedSystemInfo();
 #endif
-    WOLFSSL_CTX* ctx;
-    ctx = (WOLFSSL_CTX*)XMALLOC(sizeof(WOLFSSL_CTX), NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
     char mydata[1024];
-    int tests = 100;
+    int tests = WOLFTPM_MAIN_TEST_ITERATIONS;
     do {
         ret += TPM2_Native_TestArgs(mydata, 0, NULL);
-        vTaskDelay(5550);
-        ESP_LOGW(TAG, "*****************************************************************************");
-        ESP_LOGW(TAG, "\n\nTest #%d\n\n", tests);
-        ESP_LOGW(TAG, "*****************************************************************************");
+        if (tests > 1) {
+            ESP_LOGW(TAG, "*************************************************");
+            ESP_LOGW(TAG, "\n\nTest #%d\n\n",
+                          WOLFTPM_MAIN_TEST_ITERATIONS - tests + 1);
+            ESP_LOGW(TAG, "*************************************************");
+            ESP_LOGI(TAG, "Waiting to start next test iteration...\n\n");
+            vTaskDelay(5550);
+        }
     } while (ret == 0 && (--tests > 0));
+
 //    ret += TPM2_Wrapper_Test(ctx);
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE

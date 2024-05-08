@@ -25,6 +25,9 @@
 /* This file if for the Espressif ESP-IDF */
 #define WOLFSSL_ESPIDF
 
+/* How many main app test loop interations? */
+#define WOLFTPM_MAIN_TEST_ITERATIONS 100
+
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
 
