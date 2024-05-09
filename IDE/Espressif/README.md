@@ -2,16 +2,33 @@
 
 Initial minimum memory requirements: 35KB Stack. See `sdkconfig.defaults`.
 
+Current memory assigned: 50960
+
 ## TODO
 
 Currently the `components\wolftpm\include\options.h` is not found by the respective component `CMakeLists.txt`, 
 so it is copied to `C:\workspace\wolfTPM-gojimmypi\wolftpm` as an interim solution.
 
-The `wrap_test.h` is currently _copied_ to the example. Consider pointing to original repo source.
+The `wrap_test.h` is currently _copied_ to the example and not used. Consider pointing to original repo source.
+
+The `native_test.h` is currently _copied_ to the example and not used. Consider pointing to original repo source.
 
 ```
 ./configure --enable-infineon --enable-i2c --with-wolfcrypt=[path]
 ```
+
+## Pin assignments
+
+**Note:** The following pin assignments are used by default, you can change these in the `menuconfig` .
+
+|                  | SDA            | SCL            |
+| ---------------- | -------------- | -------------- |
+| ESP I2C Master   | I2C_MASTER_SDA | I2C_MASTER_SCL |
+| TPM2 Device      | SDA            | SCL            |
+
+For the actual default value of `I2C_MASTER_SDA` and `I2C_MASTER_SCL` see `Example Configuration` in `menuconfig`.
+
+**Note:** There's no need to add an external pull-up resistors for SDA/SCL pin, because the driver will enable the internal pull-up resistors.
 
 ## Troubleshooting
 
