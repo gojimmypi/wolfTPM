@@ -46,7 +46,7 @@
 #include <wolfssl/internal.h>
 
 /* project */
-#include "native_test.h"
+#include <examples/native/native_test.h>
 #include "main.h"
 
 #ifndef WOLFTPM_MAIN_TEST_ITERATIONS
