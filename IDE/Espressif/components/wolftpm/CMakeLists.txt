@@ -462,12 +462,7 @@ else()
         "\"${COMPONENT_DIR}/include\""
         )
 
-
-    list(APPEND COMPONENT_ADD_INCLUDEDIRS "\"${WOLFTPM_ROOT}\"")
-#    list(APPEND COMPONENT_ADD_INCLUDEDIRS "\"${WOLFTPM_ROOT}/wolfssl/wolfcrypt/\"")
-
-
-    # Some files are known to be included elsewhere, or not used for Espressif
+# If any files are known to be included elsewhere, or not used for Espressif
 #    set(COMPONENT_SRCEXCLUDE
 #        )
 
