@@ -32,7 +32,21 @@
 #include <hal/tpm_io.h>
 #include <examples/tpm_test.h>
 
-#include <stdio.h>
+//#ifdef WOLFSSL_ESPIDF
+//    #include <esp_log.h>
+//    const char* TAG = "native_Test";
+//    void do_pause()
+//    {
+//        ESP_LOGI(TAG, "pause");
+//    }
+//    #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
+//    #define printf(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
+//#else
+//    #include <stdio.h>
+//    #define printf(...) printf(__VA_ARGS__)
+//#endif
+
+
 
 /******************************************************************************/
 /* --- BEGIN TPM Native API Tests -- */
@@ -212,7 +226,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Init(&tpm2Ctx, TPM2_IoCb, userCtx);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Init failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 
     printf("TPM2: Caps 0x%08x, Did 0x%04x, Vid 0x%04x, Rid 0x%2x \n",
@@ -233,7 +247,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS &&
         rc != TPM_RC_INITIALIZE /* TPM_RC_INITIALIZE = Already started */ ) {
         printf("TPM2_Startup failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Startup pass\n");
 
@@ -243,7 +257,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_SelfTest(&cmdIn.selfTest);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_SelfTest failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_SelfTest pass\n");
 
@@ -252,7 +266,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetTestResult failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_GetTestResult: Size %d, Rc 0x%x\n", cmdOut.tr.outData.size,
         cmdOut.tr.testResult);
@@ -278,7 +292,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetCapability failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     tpmProp = &cmdOut.cap.capabilityData.data.tpmProperties;
     printf("TPM2_GetCapability: Property FamilyIndicator 0x%08x\n",
@@ -291,7 +305,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetCapability failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     tpmProp = &cmdOut.cap.capabilityData.data.tpmProperties;
     pcrCount = tpmProp->tpmProperty[0].value;
@@ -307,7 +321,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetCapability failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     tpmProp = &cmdOut.cap.capabilityData.data.tpmProperties;
     printf("TPM2_GetCapability: Property FIRMWARE_VERSION_1 0x%08x\n",
@@ -320,7 +334,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetCapability failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     tpmProp = &cmdOut.cap.capabilityData.data.tpmProperties;
     printf("TPM2_GetCapability: Property FIRMWARE_VERSION_2 0x%08x\n",
@@ -356,13 +370,13 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_GetRandom failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     /* the getRand and getRand2 have same return size header in cmdOut union */
     if (cmdOut.getRand.randomBytes.size != i) {
         printf("TPM2_GetRandom length mismatch %d != %d\n",
             cmdOut.getRand.randomBytes.size, i);
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_GetRandom: Got %d bytes\n", cmdOut.getRand.randomBytes.size);
     TPM2_PrintBin(cmdOut.getRand.randomBytes.buffer,
@@ -378,7 +392,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_StirRandom failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_StirRandom: success\n");
 
@@ -389,7 +403,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ReadClock failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_ReadClock: success\n");
 
@@ -404,7 +418,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         if (rc != TPM_RC_SUCCESS) {
             printf("TPM2_PCR_Read failed 0x%x: %s\n", rc,
                 TPM2_GetRCString(rc));
-            goto exit;
+            ERROR_OUT(rc, exit);
         }
         printf("TPM2_PCR_Read: Index %d, Count %d\n",
             pcrIndex, (int)cmdOut.pcrRead.pcrValues.count);
@@ -433,7 +447,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PCR_Extend failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PCR_Extend success\n");
 
@@ -443,7 +457,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_PCR_Read(&cmdIn.pcrRead, &cmdOut.pcrRead);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PCR_Read failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PCR_Read: Index %d, Count %d\n",
             pcrIndex, (int)cmdOut.pcrRead.pcrValues.count);
@@ -467,7 +481,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PCR_Reset failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PCR_Reset command success\n");
 
@@ -479,7 +493,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_PCR_Read(&cmdIn.pcrRead, &cmdOut.pcrRead);
     if (rc != TPM_RC_SUCCESS) {
         printf("PCR Reset: Read failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("PCR Reset: PCR%d read successfully after reset\n", pcrIndex);
     if (cmdOut.pcrRead.pcrValues.count > 0) {
@@ -507,13 +521,14 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc < 0) {
         printf("TPM2_GetNonce failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
+    /* This is a fairly long-running test: */
     rc = TPM2_StartAuthSession(&cmdIn.authSes, &cmdOut.authSes);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_StartAuthSession failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     sessionHandle = cmdOut.authSes.sessionHandle;
     session[0].nonceTPM = cmdOut.authSes.nonceTPM;
@@ -527,7 +542,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != sessionAuth.size) {
         printf("KDFa ATH Gen Error %d\n", rc);
         rc = TPM_RC_FAILURE;
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 #endif
     printf("TPM2_StartAuthSession: sessionHandle 0x%x\n", (word32)sessionHandle);
@@ -539,7 +554,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PolicyGetDigest failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PolicyGetDigest: size %d\n",
         cmdOut.policyGetDigest.policyDigest.size);
@@ -554,7 +569,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PCR_Read failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PCR_Read: Index %d, Digest Sz %d, Update Counter %d\n",
         pcrIndex,
@@ -585,7 +600,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PolicyPCR failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     else {
         printf("TPM2_PolicyPCR: Updated\n");
@@ -601,7 +616,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PolicyRestart failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PolicyRestart: Done\n");
 
@@ -612,11 +627,12 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     XMEMCPY(cmdIn.hashSeqStart.auth.buffer, usageAuth,
         cmdIn.hashSeqStart.auth.size);
     cmdIn.hashSeqStart.hashAlg = TPM_ALG_SHA256;
+    /* This is a fairly long-running test: */
     rc = TPM2_HashSequenceStart(&cmdIn.hashSeqStart, &cmdOut.hashSeqStart);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_HashSequenceStart failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     handle = cmdOut.hashSeqStart.sequenceHandle;
     printf("TPM2_HashSequenceStart: sequenceHandle 0x%x\n", (word32)handle);
@@ -634,7 +650,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_SequenceUpdate failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 
     XMEMSET(&cmdIn.seqComp, 0, sizeof(cmdIn.seqComp));
@@ -644,13 +660,13 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_SequenceComplete failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     if (cmdOut.seqComp.result.size != TPM_SHA256_DIGEST_SIZE &&
         XMEMCMP(cmdOut.seqComp.result.buffer, hashTestDig,
                                                 TPM_SHA256_DIGEST_SIZE) != 0) {
         printf("Hash SHA256 test failed, result not as expected!\n");
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("Hash SHA256 test success\n");
 
@@ -666,7 +682,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Clear(&cmdIn.clear);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Clear failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Clear Owner\n");
 #endif
@@ -696,7 +712,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_CreatePrimary(&cmdIn.createPri, &cmdOut.createPri);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_CreatePrimary: Endorsement failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     endorse.handle = cmdOut.createPri.objectHandle;
     endorse.auth = cmdIn.createPri.inPublic.publicArea.authPolicy;
@@ -730,7 +746,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_CreatePrimary: Storage failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     storage.handle = cmdOut.createPri.objectHandle;
     storage.pub = cmdOut.createPri.outPublic;
@@ -769,7 +785,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_CreateLoaded(&cmdIn.createLoaded, &cmdOut.createLoaded);
     if (rc == TPM_RC_SUCCESS) {
         printf("TPM2_CreateLoaded: handle 0x%x pub %d, priv %d\n",
-               cmdOut.createLoaded.objectHandle, cmdOut.createLoaded.outPublic.size,
+               (unsigned int)cmdOut.createLoaded.objectHandle, cmdOut.createLoaded.outPublic.size,
                cmdOut.createLoaded.outPrivate.size);
         cmdIn.flushCtx.flushHandle = cmdOut.createLoaded.objectHandle;
         TPM2_FlushContext(&cmdIn.flushCtx);
@@ -780,7 +796,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     else {
         printf("TPM2_CreateLoaded failed %d: %s\n", rc,
                TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 
     /* Load public key */
@@ -791,7 +807,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_LoadExternal: failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     handle = cmdOut.loadExt.objectHandle;
     printf("TPM2_LoadExternal: 0x%x\n", (word32)handle);
@@ -807,7 +823,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_MakeCredential: failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_MakeCredential: credentialBlob %d, secret %d\n",
         cmdOut.makeCred.credentialBlob.size,
@@ -821,7 +837,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ReadPublic failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_ReadPublic Handle 0x%x: pub %d, name %d, qualifiedName %d\n",
         (word32)cmdIn.readPub.objectHandle,
@@ -856,7 +872,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Create(&cmdIn.create, &cmdOut.create);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Create HMAC failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     hmacKey.pub = cmdOut.create.outPublic;
     hmacKey.priv = cmdOut.create.outPrivate;
@@ -870,7 +886,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Load(&cmdIn.load, &cmdOut.load);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Load failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     hmacKey.handle = cmdOut.load.objectHandle;
     printf("TPM2_Load New HMAC Key Handle 0x%x\n", (word32)hmacKey.handle);
@@ -894,7 +910,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_PolicyCommandCode failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_PolicyCommandCode: success\n");
 
@@ -908,13 +924,13 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc < 0) {
         printf("TPM2_GetNonce failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     rc = TPM2_ObjectChangeAuth(&cmdIn.objChgAuth, &cmdOut.objChgAuth);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ObjectChangeAuth failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        //goto exit;
+        ERROR_OUT(rc, exit);
     }
     hmacKey.priv = cmdOut.objChgAuth.outPrivate;
     printf("TPM2_ObjectChangeAuth: private %d\n", hmacKey.priv.size);
@@ -938,7 +954,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ECC_Parameters failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_ECC_Parameters: CurveID %d, sz %d, p %d, a %d, b %d, "
             "gX %d, gY %d, n %d, h %d\n",
@@ -973,7 +989,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Create ECDSA failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Create: New ECDSA Key: pub %d, priv %d\n",
         cmdOut.create.outPublic.size,
@@ -990,7 +1006,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Load ECDSA failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     eccKey.handle = cmdOut.load.objectHandle;
     printf("TPM2_Load ECDSA Key Handle 0x%x\n", (word32)eccKey.handle);
@@ -1011,7 +1027,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Sign(&cmdIn.sign, &cmdOut.sign);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Sign failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Sign: ECC S %d, R %d\n",
         cmdOut.sign.signature.signature.ecdsa.signatureS.size,
@@ -1027,7 +1043,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_VerifySignature failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_VerifySignature: Tag %d\n", cmdOut.verifySign.validation.tag);
 
@@ -1059,7 +1075,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Create(&cmdIn.create, &cmdOut.create);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Create ECDH failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Create: New ECDH Key: pub %d, priv %d\n",
         cmdOut.create.outPublic.size,
@@ -1076,7 +1092,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Load ECDH key failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     eccKey.handle = cmdOut.load.objectHandle;
     printf("TPM2_Load ECDH Key Handle 0x%x\n", (word32)eccKey.handle);
@@ -1092,7 +1108,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ECDH_KeyGen failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_ECDH_KeyGen: zPt %d, pubPt %d\n",
         cmdOut.ecdh.zPoint.size,
@@ -1108,7 +1124,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_ECDH_KeyGen failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_ECDH_ZGen: zPt %d\n",
         cmdOut.ecdhZ.outPoint.size);
@@ -1151,7 +1167,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Create RSA failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_Create: New RSA Key: pub %d, priv %d\n",
         cmdOut.create.outPublic.size,
@@ -1173,7 +1189,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Load RSA key failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     rsaKey.handle = cmdOut.load.objectHandle;
     printf("TPM2_Load RSA Key Handle 0x%x\n", (word32)rsaKey.handle);
@@ -1195,7 +1211,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_RSA_Encrypt failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_RSA_Encrypt: %d\n", cmdOut.rsaEnc.outData.size);
 
@@ -1211,7 +1227,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_RSA_Decrypt failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_RSA_Decrypt: %d\n", cmdOut.rsaDec.message.size);
 
@@ -1237,7 +1253,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_CertifyCreation RSA key failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     else {
         printf("TPM2_CertifyCreation test passed\n");
@@ -1270,7 +1286,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_NV_DefineSpace failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_NV_DefineSpace: 0x%x\n", (word32)nvIndex);
 
@@ -1281,7 +1297,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_NV_ReadPublic failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     printf("TPM2_NV_ReadPublic: Sz %d, Idx 0x%x, nameAlg %d, Attr 0x%x, "
             "authPol %d, dataSz %d, name %d\n",
@@ -1301,7 +1317,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_NV_UndefineSpace failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 #endif
 
@@ -1323,7 +1339,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         if (rc != TPM_RC_SUCCESS) {
             printf("TPM2_SetCommandSet failed 0x%x: %s\n", rc,
                 TPM2_GetRCString(rc));
-            goto exit;
+            ERROR_OUT(rc, exit);
         }
     }
 #endif
@@ -1350,7 +1366,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Create(&cmdIn.create, &cmdOut.create);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Create symmetric failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     aesKey.pub = cmdOut.create.outPublic;
     aesKey.priv = cmdOut.create.outPrivate;
@@ -1364,7 +1380,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_Load(&cmdIn.load, &cmdOut.load);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_Load failed 0x%x: %s\n", rc, TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
     aesKey.handle = cmdOut.load.objectHandle;
     printf("TPM2_Load New AES Key Handle 0x%x\n", (word32)aesKey.handle);
@@ -1396,7 +1412,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     else if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_EncryptDecrypt2 failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));
-        goto exit;
+        ERROR_OUT(rc, exit);
     }
 
     if(perform_EncryptDecrypt2) {
@@ -1416,7 +1432,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         else if (rc != TPM_RC_SUCCESS) {
             printf("TPM2_EncryptDecrypt2 failed 0x%x: %s\n", rc,
                    TPM2_GetRCString(rc));
-            goto exit;
+            ERROR_OUT(rc, exit);
         }
 
         /* Verify plain and decrypted data are the same */
@@ -1432,7 +1448,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         }
         else {
             printf("Encrypt/Decrypt test failed, result not as expected!\n");
-            goto exit;
+            ERROR_OUT(rc, exit);
         }
     }
 exit:
@@ -1477,8 +1493,15 @@ exit:
 
     /* Shutdown */
     cmdIn.shutdown.shutdownType = TPM_SU_CLEAR;
-    if (TPM2_Shutdown(&cmdIn.shutdown) != TPM_RC_SUCCESS) {
-        printf("TPM2_Shutdown failed\n");
+
+    printf("Begin TPM2 shutdown process...\n");
+    rc = TPM2_Shutdown(&cmdIn.shutdown);
+    if (rc == TPM_RC_SUCCESS) {
+        printf("TPM2_Shutdown success\n");
+    }
+    else {
+        printf("TPM2_Shutdown failed,failed 0x%x: %s\n", rc,
+               TPM2_GetRCString(rc));
     }
 
     TPM2_Cleanup(&tpm2Ctx);
