@@ -3,7 +3,7 @@
 #
 # wolfssl template
 #
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS -DWOLFTPM_USER_SETTINGS")
 
 if(WIN32)
     # Windows-specific configuration here

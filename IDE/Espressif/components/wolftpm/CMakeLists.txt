@@ -30,7 +30,7 @@ cmake_minimum_required(VERSION 3.16)
 set(VERBOSE_COMPONENT_MESSAGES 1)
 
 # The scope of this CMAKE_C_FLAGS is just this component:
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS -DWOLFTPM_USER_SETTINGS")
 
 set(CMAKE_CURRENT_SOURCE_DIR ".")
 set(COMPONENT_REQUIRES wolfssl driver) # "driver" includes the I2C API

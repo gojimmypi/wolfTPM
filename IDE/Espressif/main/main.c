@@ -39,7 +39,11 @@
 #endif
 
 /* wolfTPM */
-#include <wolftpm/options.h>
+#ifdef WOLFTPM_USER_SETTINGS
+    /* See wolfSSL user_settings.h for wolfTPM configuration */
+#else
+    #include <wolftpm/options.h>
+#endif
 #include <wolftpm/version.h>
 
 /* project */
