@@ -456,13 +456,14 @@ else()
 
     # wolftpm-specific include directories
     set(COMPONENT_ADD_INCLUDEDIRS
+        "."
         "./include"
-        "\"${WOLFTPM_ROOT}/\""
-        "\"${COMPONENT_DIR}/include/\""
+        "\"${WOLFTPM_ROOT}\""
+        "\"${COMPONENT_DIR}/include\""
         )
 
 
-    list(APPEND COMPONENT_ADD_INCLUDEDIRS "\"${WOLFTPM_ROOT}/\"")
+    list(APPEND COMPONENT_ADD_INCLUDEDIRS "\"${WOLFTPM_ROOT}\"")
 #    list(APPEND COMPONENT_ADD_INCLUDEDIRS "\"${WOLFTPM_ROOT}/wolfssl/wolfcrypt/\"")
 
 
