@@ -229,6 +229,23 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         ERROR_OUT(rc, exit);
     }
 
+#ifdef WOLFSSL_ESPIDF
+    /* Initialize with a TPM shutdown first on the Espressif environment.
+     * If we cannot shutdown here, there will almost certainly be an
+     * error encounrtered later. If so, try hard reset on TPM board. */
+    vTaskDelay(100);
+    printf("Begin TPM2 shutdown process...\n");
+    rc = TPM2_Shutdown(&cmdIn.shutdown);
+    if (rc == TPM_RC_SUCCESS) {
+        printf("TPM2_Shutdown success\n");
+    }
+    else {
+        printf("TPM2_Shutdown failed,failed 0x%x: %s\n", rc,
+               TPM2_GetRCString(rc));
+    }
+    vTaskDelay(100);
+#endif
+
     printf("TPM2: Caps 0x%08x, Did 0x%04x, Vid 0x%04x, Rid 0x%2x \n",
         tpm2Ctx.caps,
         tpm2Ctx.did_vid >> 16,
