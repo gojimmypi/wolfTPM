@@ -51,27 +51,6 @@
 
 #define TPM2_DEMO_PCR_INDEX             16
 
-
-//#ifdef WOLFSSL_ESPIDF
-//    #include <esp_log.h>
-//    const char* TAG = "native_Test";
-//
-//    #ifndef WOLFSSL_NOPRINTF
-//        void do_pause()
-//        {
-//            ESP_LOGI(TAG, "pause");
-//        }
-//        #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
-//        #define printf_error(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
-//    #else
-//        #define printf(...) {}
-//        #define printf_error(...) {}
-//    #endif
-//#else
-//    #include <stdio.h>
-//    #define printf_error(...) printf(__VA_ARGS__)
-//#endif
-
 static const char gStorageKeyAuth[] = "ThisIsMyStorageKeyAuth";
 static const char gAiKeyAuth[] =      "ThisIsMyAiKeyAuth";
 static const char gKeyAuth[] =        "ThisIsMyKeyAuth";

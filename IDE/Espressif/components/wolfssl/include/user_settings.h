@@ -677,10 +677,8 @@ Turn on timer debugging (used when CPU cycles not available)
  * cause errors. Debug with caution. Debug options available: */
 /* #define WOLFTPM_DEBUG_IO */
 
-
-// #define WOLFSSL_NOPRINTF
-
-// #define XPRINTF
+/* Optionally disable printf */
+/* #define WOLFSSL_NOPRINTF */
 
 #ifdef WOLFSSL_ESPIDF
     #include <esp_log.h>

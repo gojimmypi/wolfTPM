@@ -174,24 +174,6 @@ enum tpm_tis_status {
 #define TPM2_TIS_UNLOCK()
 #endif
 
-//#ifdef WOLFSSL_ESPIDF
-//    #include <esp_log.h>
-//    #define  ESP_LOG_TAG  "tpm2_tis"
-//    #ifndef WOLFSSL_NOPRINTF
-//        void do_pause()
-//        {
-//            ESP_LOGI(TAG, "pause");
-//        }
-//        #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
-//        #define printf(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
-//    #else
-//        #define printf(...) {}
-//        #define printf(...) {}
-//    #endif
-//#else
-//    #include <stdio.h>
-//    #define printf(...) printf(__VA_ARGS__)
-//#endif
 int TPM2_TIS_Read(TPM2_CTX* ctx, word32 addr, byte* result,
     word32 len)
 {

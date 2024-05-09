@@ -37,18 +37,6 @@
 
 #include <wolfssl/ssl.h>
 
-//#ifdef WOLFSSL_ESPIDF
-//    #include <esp_log.h>
-//    const char* TAG = "native_Test";
-//    #ifndef WOLFSSL_NOPRINTF
-//        #define printf(...) ESP_LOGI(TAG, __VA_ARGS__)
-//    #else
-//        #define printf(...) {}
-//    #endif
-//#else
-//    #include <stdio.h>
-//#endif
-
 #ifdef __cplusplus
     extern "C" {
 #endif

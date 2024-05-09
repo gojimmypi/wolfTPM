@@ -32,22 +32,6 @@
 #include <hal/tpm_io.h>
 #include <examples/tpm_test.h>
 
-//#ifdef WOLFSSL_ESPIDF
-//    #include <esp_log.h>
-//    const char* TAG = "native_Test";
-//    void do_pause()
-//    {
-//        ESP_LOGI(TAG, "pause");
-//    }
-//    #define printf(...)       ESP_LOGI(TAG, __VA_ARGS__)
-//    #define printf(...) { ESP_LOGE(TAG, __VA_ARGS__); do_pause(); }
-//#else
-//    #include <stdio.h>
-//    #define printf(...) printf(__VA_ARGS__)
-//#endif
-
-
-
 /******************************************************************************/
 /* --- BEGIN TPM Native API Tests -- */
 /******************************************************************************/
@@ -297,7 +281,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     printf("TPM2_IncrementalSelfTest: Rc 0x%x, Alg 0x%x (Todo %d)\n",
            rc, cmdIn.incSelfTest.toTest.algorithms[0],
            (int)cmdOut.incSelfTest.toDoList.count);
-#endif
+#endif /* WOLFTPM_WINAPI */
 
 
     /* Get Capability for Property */
@@ -624,7 +608,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     }
     XMEMSET(&session[0], 0, sizeof(TPM2_AUTH_SESSION));
     session[0].sessionHandle = TPM_RS_PW;
-#endif
+#endif /* !WOLFTPM2_NO_WOLFCRYPT */
 
     /* Policy Restart (for session) */
     XMEMSET(&cmdIn.policyRestart, 0, sizeof(cmdIn.policyRestart));
