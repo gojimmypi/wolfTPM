@@ -13,11 +13,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Espressif Files", "Espressi
 		..\..\..\hal\tpm_io_espressif.c = ..\..\..\hal\tpm_io_espressif.c
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "wolfTPM", "wolfTPM", "{2C453D8A-F3DC-450D-A0DC-F0DC3C57CCAF}"
-	ProjectSection(SolutionItems) = preProject
-		..\..\..\wolftpm\options.h = ..\..\..\wolftpm\options.h
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|VisualGDB = Debug|VisualGDB
@@ -37,9 +32,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{2C453D8A-F3DC-450D-A0DC-F0DC3C57CCAF} = {D6BFEB43-3140-472F-BAD1-BADC700D4BFA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FD2377E1-FFF2-4C58-B868-261BABD072AC}
