@@ -46,6 +46,9 @@
 #undef  WOLFSSL_ESPIDF
 #define WOLFSSL_ESPIDF
 
+/* optionally enable a TLS test */
+#define WOLFTPM_TLS_EXAMPLE
+
 /* We don't use WiFi, so don't compile in the esp-sdk-lib WiFi helpers: */
 /* #define USE_WOLFSSL_ESP_SDK_WIFI */
 
@@ -76,7 +79,11 @@
  * Memory requirement is about 5KB, otherwise 20K is needed when not specified.
  * If extra small footprint is needed, try MICRO_SESSION_CACHE (< 1K)
  * When really desperate or no TLS used, try NO_SESSION_CACHE.  */
-#define NO_SESSION_CACHE
+#ifdef WOLFTPM_TLS_EXAMPLE
+    #define MICRO_SESSION_CACHE
+#else
+    #define NO_SESSION_CACHE
+#endif
 
 /* Small Stack uses more heap. */
 #define WOLFSSL_SMALL_STACK
@@ -676,6 +683,17 @@ Turn on timer debugging (used when CPU cycles not available)
 /* Beware that delays in sending data to UART may affect I2C timing and
  * cause errors. Debug with caution. Debug options available: */
 /* #define WOLFTPM_DEBUG_IO */
+
+#ifdef WOLFTPM_TLS_EXAMPLE
+    /* crypto callbacks needed for wolfSSL when using TLS */
+    #undef  WOLF_CRYPTO_CB
+    #define WOLF_CRYPTO_CB
+
+    #ifdef NO_SESSION_CACHE
+        #error "NO_SESSION_CACHE cannot be used in the TPM example. Try MICRO_SESSION_CACHE"
+    #endif
+#endif
+
 
 /* Optionally disable printf */
 /* #define WOLFSSL_NOPRINTF */

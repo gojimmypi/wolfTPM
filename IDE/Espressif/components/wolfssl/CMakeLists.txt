@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.16)
 set(VERBOSE_COMPONENT_MESSAGES 1)
 
 # The scope of this CMAKE_C_FLAGS is just this component:
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS -DWOLFTPM_USER_SETTINGS")
 
 set(CMAKE_CURRENT_SOURCE_DIR ".")
 # set(COMPONENT_REQUIRES lwip) # we typically don't need lwip directly in wolfssl component
@@ -550,7 +550,10 @@ else()
         "\"${WOLFSSL_ROOT}/src/ssl_bn.c\""      # included by ssl.c
         "\"${WOLFSSL_ROOT}/src/ssl_certman.c\"" # included by ssl.c
         "\"${WOLFSSL_ROOT}/src/ssl_crypto.c\""  # included by ssl.c
+        "\"${WOLFSSL_ROOT}/src/ssl_load.c\""    # included by ssl.c
         "\"${WOLFSSL_ROOT}/src/ssl_misc.c\""    # included by ssl.c
+        "\"${WOLFSSL_ROOT}/src/ssl_sess.c\""    # included by ssl.c
+        "\"${WOLFSSL_ROOT}/src/ssl_p7p12.c\""   # included by ssl.c
         "\"${WOLFSSL_ROOT}/src/x509.c\""
         "\"${WOLFSSL_ROOT}/src/x509_str.c\""
         "\"${WOLFSSL_ROOT}/wolfcrypt/src/evp.c\""

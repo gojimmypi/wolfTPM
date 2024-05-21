@@ -47,8 +47,13 @@ endif()
 idf_component_register(SRCS
                           "main.c"
                           "../../../examples/native/native_test.c"
+                          "../../../examples/tls/tls_client.c"
+                          "../../../examples/tpm_test_keys.c"
                        INCLUDE_DIRS
                           "."
+                          "../../../examples/native"
+                          "../../../examples/tls"
+                          "../../../examples" # tpm_test_keys.h located here
                           "./include")
 
 #

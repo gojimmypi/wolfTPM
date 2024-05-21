@@ -48,6 +48,12 @@
 
 /* project */
 #include <examples/native/native_test.h>
+
+#ifdef WOLFTPM_TLS_EXAMPLE
+    #include <examples/tls/tls_client.h>
+    #include <tpm_test_keys.h>
+#endif
+
 #include "main.h"
 
 #ifndef WOLFTPM_MAIN_TEST_ITERATIONS
@@ -59,6 +65,10 @@ static const char* const TAG = "wolfTPM main";
 void app_main(void)
 {
     char mydata[1024];
+#ifdef WOLFTPM_TLS_EXAMPLE
+    char* argv[] = { 0 };
+    int argc = 0;
+#endif
     int tests = WOLFTPM_MAIN_TEST_ITERATIONS;
     esp_err_t ret = 0;
 
@@ -84,6 +94,12 @@ void app_main(void)
             vTaskDelay(5550);
         }
     } while (ret == 0 && (--tests > 0));
+
+#ifdef WOLFTPM_TLS_EXAMPLE
+    if (ret == 0) {
+        ret = TPM2_TLS_ClientArgs(NULL, argc, argv);
+    }
+#endif
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE
     if (ret == 0) {

@@ -37,6 +37,10 @@
 
 #include <wolfssl/ssl.h>
 
+#ifdef WOLFSSL_ESPIDF
+    #include <netdb.h>
+#endif
+
 #ifdef __cplusplus
     extern "C" {
 #endif
