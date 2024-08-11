@@ -42,6 +42,8 @@
 
 /* Espressif */
 #include "sdkconfig.h"
+#include <driver/gpio.h>
+#include <driver/spi_master.h>
 
 #define TAG "TPM_IO"
 
@@ -439,9 +441,6 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
 
 #else /* If not I2C, it must be SPI  */
 
-#include <driver/gpio.h>
-#include <driver/spi_master.h>
-
 // FSPI (HOST_SPI2) on esp32-s3-wroom
 #define PIN_NUM_MISO 13
 #define PIN_NUM_MOSI 11
@@ -503,8 +502,8 @@ int esp_spi_master_init() {
     return 0;
 }
 
-// Aquire SPI bus and keep pulling CS
-int tpm_spi_acquire ()
+/* Aquire SPI bus and keep pulling CS */
+int tpm_spi_acquire()
 {
     int ret;
     gpio_set_level(tpm_data->cs_pin, 0);
@@ -512,7 +511,7 @@ int tpm_spi_acquire ()
     return ret;
 }
 
-// Release SPI bus and CS
+/* Release SPI bus and CS */
 int tpm_spi_release ()
 {
     gpio_set_level(tpm_data->cs_pin, 1);
@@ -521,26 +520,26 @@ int tpm_spi_release ()
 }
 
 int tpm_spi_raw_transfer (const byte *data_out, byte *data_in, size_t cnt) {
-    
-    // Maximum transfer size is 64 byte because we don't use DMA
+
+    /* Maximum transfer size is 64 byte because we don't use DMA. */
     if (cnt > SPI_MAX_TRANSFER) {
         printf("tpm_io_espressif: cnt %d\n", cnt);
         return -1;
     }
 
-    // At least one of the buffers has to be set
+    /* At least one of the buffers has to be set. */
     if (data_out == NULL && data_in == NULL) {
         return -1;
     }
 
-    // Setup transaction
+    /* Setup transaction */
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
     t.length = cnt*8;
     t.tx_buffer = data_out;
     t.rx_buffer = data_in;
 
-    // Transmit
+    /* Transmit */
     esp_err_t ret = spi_device_polling_transmit(tpm_data->spi, &t);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "spi_transmit returned error %d\n", ret);
@@ -548,15 +547,15 @@ int tpm_spi_raw_transfer (const byte *data_out, byte *data_in, size_t cnt) {
     }
 
     return 0;
-}
-    
+} /* tpm_spi_raw_transfer */
+
 int TPM2_IoCb_Espressif_SPI(TPM2_CTX* ctx, const byte* txBuf, byte* rxBuf,
-    word16 xferSz, void* userCtx) {
+                            word16 xferSz, void* userCtx) {
     int ret = TPM_RC_FAILURE;
 
     if (_is_initialized_spi)
         ret = ESP_OK;
-    else {            
+    else {
         ret = esp_spi_master_init(); /* ESP return code, not TPM */
         ESP_LOGV(TAG, "HAL: Initializing SPI %d", ret);
     }
@@ -572,10 +571,10 @@ int TPM2_IoCb_Espressif_SPI(TPM2_CTX* ctx, const byte* txBuf, byte* rxBuf,
     }
 
     (void)ctx;
-    return ret;    
-}
-#endif
+    return ret;
+} /* TPM2_IoCb_Espressif_SPI */
 
+#endif /* Espressif SPI */
 #endif /* WOLFSSL_ESPIDF */
 #endif /* WOLFTPM_INCLUDE_IO_FILE */
 
