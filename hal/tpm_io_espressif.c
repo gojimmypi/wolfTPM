@@ -204,16 +204,6 @@ static esp_err_t esp_i2c_master_init(void)
     ESP_LOGI(TAG, "I2C_MASTER_SCL_IO     = %d", (int)I2C_MASTER_SCL_IO);
     ESP_LOGI(TAG, "I2C_MASTER_SDA_IO     = %d", (int)I2C_MASTER_SDA_IO);
 
-#if WOLFSSL_USE_LEGACY_I2C
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
-    };
-
     i2c_param_config(i2c_master_port, &conf);
 #else
     esp_err_t ret = ESP_FAIL;
@@ -263,7 +253,6 @@ static esp_err_t esp_tpm_register_read(uint32_t reg, uint8_t *data, size_t len)
     }
 
     buf[0] = (reg & 0xFF); /* convert to simple 8-bit address for I2C */
-    int timeout = TPM_I2C_TRIES;
 
     /* The I2C takes about 80us to wake up and will NAK until it is ready */
     do {
@@ -281,7 +270,6 @@ static esp_err_t esp_tpm_register_read(uint32_t reg, uint8_t *data, size_t len)
      * (success wake or real read) */
     XSLEEP_MS(WRITE_TO_READ_GUARD_TIME); /* guard time - should be min 250us */
 
-    int loops = 0;
     if (ret == ESP_OK) {
         timeout = TPM_I2C_TRIES;
         do {
@@ -327,8 +315,6 @@ static esp_err_t esp_tpm_register_write(uint32_t reg,
     int result = ESP_FAIL;
     int timeout = TPM_I2C_TRIES;
     byte buf[MAX_SPI_FRAMESIZE + 1];
-    int timeout = TPM_I2C_TRIES;
-    int result = ESP_FAIL;
 
     /* TIS layer should never provide a buffer larger than this,
      * but double check for good coding practice */
@@ -450,7 +436,6 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
 #else /* If not I2C, it must be SPI  */
     /* TODO implement SPI */
 
-#else /* SPI */
     #ifndef TPM2_SPI_HZ
         /* Use the max speed by default
          * See tpm2_types.h for chip specific max values */
