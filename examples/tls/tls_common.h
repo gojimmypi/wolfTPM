@@ -39,6 +39,8 @@
 
 #ifdef WOLFSSL_ESPIDF
     #include <netdb.h>
+#else
+	#include <stdio.h>
 #endif
 
 #ifdef __cplusplus
