@@ -1,0 +1,61 @@
+#
+# Copyright (C) 2006-2022 wolfSSL Inc.  All rights reserved.
+#
+# This file is part of wolfSSL for the Espressif ESP-IDF.
+#
+# Contact licensing@wolfssl.com with any questions or comments.
+#
+# https://www.wolfssl.com
+#
+#
+# Kconfig for wolftpm
+#
+menu "wolfTPM"
+
+    config TLS_STACK_WOLFSSL
+        bool "Include wolfSSL in ESP-TLS"
+        default y
+        select FREERTOS_ENABLE_BACKWARD_COMPATIBILITY
+        help
+            Includes wolfSSL in ESP-TLS so that it can be compiled with wolfSSL as its SSL/TLS library.
+
+    config ESP_TLS_USING_WOLFSSL_SPECIFIED
+        bool "Use the specified wolfssl for ESP-TLS"
+        default Y
+        help
+            Includes wolfSSL from specified directory (not using esp-wolfssl).
+
+    config CUSTOM_SETTING_WOLFSSL_ROOT
+        string "Enter a path for wolfSSL source code"
+        default "~/workspace/wolfssl"
+        help
+            This option lets you specify a directory for the wolfSSL source code (typically a git clone). Enter the path using forward slashes (e.g., C:/myfolder/mysubfolder) or double backslashes (e.g., C:\\myfolder\\mysubfolder).
+
+    config WOLFSSL_HAVE_ALPN
+        bool "Enable ALPN (Application Layer Protocol Negotiation) in wolfSSL"
+        default n
+
+    config WOLFSSL_ALLOW_TLS12
+        bool "Allow TLS 1.2"
+        default n
+        help
+            Allow TLS to fallback to TLS1.2. Memory footprint will likely be larger for TLS1.2.
+            When disabled HTTPS and MQTT over TLS connections will fail if TLS1.3 not accepted.
+
+    config WOLFSSL_HAVE_OCSP
+        bool "Enable OCSP (Online Certificate Status Protocol) in wolfSSL"
+        default n
+
+    config IGNORE_ESP_IDF_WOLFSSL_COMPONENT
+        bool "Ignore the ESP-IDF component of wolfSSL (if present)"
+        default n
+        help
+            Ignores wolfSSL present in the esp-idf/components directory. Requires wolfssl as a local component.
+
+    config IGNORE_LOCAL_WOLFSSL_COMPONENT
+        bool "Ignore the local component of wolfSSL (if present)"
+        default n
+        help
+            Ignores wolfSSL present in the local project components directory. Requires wolfssl as a ESP-IDF component.
+
+endmenu # wolfSSL
