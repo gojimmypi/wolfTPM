@@ -135,3 +135,17 @@ IDE/VisualStudio/Debug
 IDE/VisualStudio/DLL Debug
 IDE/VisualStudio/DLL Release
 IDE/VisualStudio/Release
+
+# VisualGDB
+/IDE/**/.visualgdb
+/IDE/**/*.vgdbproj.*.user
+
+# Espressif
+IDE/Espressif/**/sdkconfig
+
+# all backup files
+*.bak
+
+# all .old" files, typically CMakeLists.txt.old
+*.old
+
