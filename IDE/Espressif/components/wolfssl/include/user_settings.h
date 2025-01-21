@@ -81,6 +81,10 @@
  * When really desperate or no TLS used, try NO_SESSION_CACHE.  */
 #ifdef WOLFTPM_TLS_EXAMPLE
     #define MICRO_SESSION_CACHE
+
+    #define TLS_HOST "www.google.com"
+
+    #define TLS_PORT 443
 #else
     #define NO_SESSION_CACHE
 #endif
@@ -643,7 +647,7 @@ Turn on timer debugging (used when CPU cycles not available)
 #define WOLFSSL_ESPIDF
 
 /* How many main app test loop interations? */
-#define WOLFTPM_MAIN_TEST_ITERATIONS 100
+#define WOLFTPM_MAIN_TEST_ITERATIONS 1
 
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
