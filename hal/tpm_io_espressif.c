@@ -204,7 +204,14 @@ static esp_err_t esp_i2c_master_init(void)
     ESP_LOGI(TAG, "I2C_MASTER_SCL_IO     = %d", (int)I2C_MASTER_SCL_IO);
     ESP_LOGI(TAG, "I2C_MASTER_SDA_IO     = %d", (int)I2C_MASTER_SDA_IO);
 
-    i2c_param_config(i2c_master_port, &conf);
+    conf.mode = I2C_MODE_MASTER;
+    conf.sda_io_num = I2C_MASTER_SDA_IO;
+    conf.scl_io_num = I2C_MASTER_SCL_IO;
+    conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
+
+    ret = i2c_param_config(i2c_master_port, &conf);
 #else
     esp_err_t ret = ESP_FAIL;
     ESP_LOGE(TAG, "TODO Need to implement non-legacy ESP-IDF I2C library");
