@@ -244,6 +244,7 @@ exit:
 #else
     (void)filename;
     (void)key;
+    rc = NOT_COMPILED_IN;
 #endif /* !NO_FILESYSTEM && !NO_WRITE_TEMP_FILES */
     return rc;
 }
@@ -422,7 +423,7 @@ int getECCkey(WOLFTPM2_DEV* pDev, WOLFTPM2_KEY* pStorageKey, WOLFTPM2_KEY* key,
     if (rc != 0) {
         return rc;
     }
-#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC)
+#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC) && !defined(NO_ASN)
     if (pWolfEccKey) {
         /* setup wolf ECC key with TPM deviceID, so crypto callbacks are used */
         rc = wc_ecc_init_ex((ecc_key*)pWolfEccKey, NULL, tpmDevId);

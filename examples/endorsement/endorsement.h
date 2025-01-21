@@ -1,4 +1,4 @@
-/* flush.h
+/* endorsement.h
  *
  * Copyright (C) 2006-2024 wolfSSL Inc.
  *
@@ -19,17 +19,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#ifndef _FLUSH_H_
-#define _FLUSH_H_
+#ifndef _WOLFTPM_ENDORSEMENT_H_
+#define _WOLFTPM_ENDORSEMENT_H_
 
 #ifdef __cplusplus
     extern "C" {
 #endif
 
-int TPM2_Flush_Tool(void* userCtx, int argc, char *argv[]);
+int TPM2_EndorsementCert_Example(void* userCtx, int argc, char *argv[]);
 
 #ifdef __cplusplus
     }  /* extern "C" */
 #endif
 
-#endif /* _FLUSH_H_ */
+#endif /* _WOLFTPM_ENDORSEMENT_H_ */

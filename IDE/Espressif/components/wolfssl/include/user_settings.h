@@ -2,14 +2,14 @@
  *
  * Copyright (C) 2006-2024 wolfSSL Inc.
  *
- * This file is part of wolfSSL.
+ * This file is part of wolfTPM.
  *
- * wolfSSL is free software; you can redistribute it and/or modify
+ * wolfTPM is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * wolfSSL is distributed in the hope that it will be useful,
+ * wolfTPM is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -23,10 +23,7 @@
  *
  * Standardized wolfSSL Espressif ESP32 + ESP8266 user_settings.h V5.7.0-1
  *
- * Do not include any wolfssl headers here
- *
- * When editing this file:
- * ensure wolfssl_test and wolfssl_benchmark settings match.
+ * Do not include any wolfssl headers here.
  */
 
 /* The Espressif project config file. See also sdkconfig.defaults */
@@ -86,7 +83,7 @@
 
     #define TLS_PORT 443
 #else
-    #define NO_SESSION_CACHE
+#define NO_SESSION_CACHE
 #endif
 
 /* Small Stack uses more heap. */
@@ -408,7 +405,7 @@
     /***** END CONFIG_IDF_TARGET_ESP8684 *****/
 
 #else
-    /* Anything else encountered, disable HW accleration */
+    /* Anything else encountered, disable HW acceleration */
     #warning "Unexpected CONFIG_IDF_TARGET_NN value"
     #define NO_ESP32_CRYPT
     #define NO_WOLFSSL_ESP32_CRYPT_HASH
@@ -641,13 +638,16 @@ Turn on timer debugging (used when CPU cycles not available)
     #endif
 #endif /* Conditional key and cert constant names */
 
-
-
-/* This file if for the Espressif ESP-IDF */
-#define WOLFSSL_ESPIDF
+/*****************************************************************************/
+/*****************************************************************************/
+/*                                                                           */
+/*                           wolfTPM                                         */
+/*                                                                           */
+/*****************************************************************************/
+/*****************************************************************************/
 
 /* How many main app test loop interations? */
-#define WOLFTPM_MAIN_TEST_ITERATIONS 1
+#define WOLFTPM_MAIN_TEST_ITERATIONS 100
 
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
@@ -667,10 +667,23 @@ Turn on timer debugging (used when CPU cycles not available)
 #define TPM_TIMEOUT_TRIES 10000
 
 /* If not defined here, TPM_I2C_TRIES is set to a default value of 10 */
-/* TPM_I2C_TRIES 10 */
+/* #define TPM_I2C_TRIES 10 */
 
-/* Examples may have a main() function, we'll have oour own: */
+/* If not defined here, I2C_MASTER_FREQ_HZ is 100000
+ * Do not exceed a value of 400000 */
+/* #define I2C_MASTER_FREQ_HZ 100000 */
+
+/* Examples may have a main() function, we'll have our own: */
 #define NO_MAIN_DRIVER
+
+/* I2C GPIO settings are defined in idf.py menuconfig
+ *
+ * CONFIG_I2C_MASTER_SCL (default SCL GPIO pin is 19)
+ * CONFIG_I2C_MASTER_SDA (default SDA GPIO pin is 18)
+ */
+
+/* The default I2C_MASTER_NUM is 0 but can be overridden: */
+/* #define I2C_MASTER_NUM 0 */
 
 /* I2C_MASTER_FREQ_HZ notes:
  *

@@ -108,7 +108,7 @@ static int TPM2_CommandProcess(TPM2_CTX* ctx, TPM2_Packet* packet,
     BYTE *param, *encParam = NULL;
     int paramSz, encParamSz = 0;
     int i, authPos;
-    int tmpSz = 0; /* Used to calculate the new total size of the Auth Area */
+    int authTotalSzPos = 0;
 #ifndef WOLFTPM2_NO_WOLFCRYPT
     UINT32 handleValue1, handleValue2, handleValue3;
     int handlePos;
@@ -120,8 +120,8 @@ static int TPM2_CommandProcess(TPM2_CTX* ctx, TPM2_Packet* packet,
     /* Parse Auth */
     TPM2_Packet_ParseU32(packet, &authSz);
     packet->pos -= sizeof(authSz);
-    /* Later Auth Area size is updated */
-    TPM2_Packet_MarkU32(packet, &tmpSz);
+    /* Get position for total auth size to be updated later */
+    TPM2_Packet_MarkU32(packet, &authTotalSzPos);
     /* Mark the position of the Auth Area data */
     authPos = packet->pos;
     packet->pos += authSz;
@@ -174,16 +174,31 @@ static int TPM2_CommandProcess(TPM2_CTX* ctx, TPM2_Packet* packet,
             }
         }
 
-        /* Note: Copy between TPM2_AUTH_SESSION and TPMS_AUTH_COMMAND is allowed */
-        XMEMCPY(&authCmd, session, sizeof(TPMS_AUTH_COMMAND));
+        /* Build auth */
+        XMEMSET(&authCmd, 0, sizeof(authCmd));
+        authCmd.sessionHandle = session->sessionHandle;
+        authCmd.sessionAttributes = session->sessionAttributes;
+        authCmd.nonce.size = session->nonceCaller.size;
+        XMEMCPY(authCmd.nonce.buffer, session->nonceCaller.buffer,
+            authCmd.nonce.size);
 
-        if (TPM2_IS_HMAC_SESSION(session->sessionHandle) ||
-            TPM2_IS_POLICY_SESSION(session->sessionHandle))
+        /* Password Auth */
+        if (session->sessionHandle == TPM_RS_PW) {
+            authCmd.hmac.size = session->auth.size;
+            XMEMCPY(authCmd.hmac.buffer, session->auth.buffer,
+                session->auth.size);
+        }
+        /* HMAC or Policy Session */
+        else if (TPM2_IS_HMAC_SESSION(session->sessionHandle) ||
+                 TPM2_IS_POLICY_SESSION(session->sessionHandle))
         {
         #ifndef WOLFTPM2_NO_WOLFCRYPT
             TPM2B_NAME name1, name2, name3;
             TPM2B_DIGEST hash;
         #endif
+
+            /* default is a HMAC output (using alg authHash) */
+            authCmd.hmac.size = TPM2_GetHashDigestSize(session->authHash);
 
             /* if param enc is not supported for this command then clear flag */
             /* session attribute flags are from TPM perspective */
@@ -240,16 +255,28 @@ static int TPM2_CommandProcess(TPM2_CTX* ctx, TPM2_Packet* packet,
         #endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_HMAC */
         }
 
-        /* Replace auth in session */
+        /* Place session auth */
         packet->pos = authPos;
         TPM2_Packet_AppendAuthCmd(packet, &authCmd);
         authPos = packet->pos; /* update auth position */
     }
 
-    /* Update the Auth Area size in the command packet */
-    TPM2_Packet_PlaceU32(packet, tmpSz);
+    /* Update the Auth Area total size in the command packet */
+    i = TPM2_Packet_PlaceU32(packet, authTotalSzPos);
+
+#ifdef DEBUG_WOLFTPM
+    if ((int)authSz != i) {
+        /* actual auth size did not match estimated size from
+         * TPM2_Packet_AppendAuth */
+        printf("Error: Calculated auth size %d did not match actual %d!\n",
+            authSz, i);
+        return BUFFER_E;
+    }
+#endif
 
     (void)cmdCode;
+    (void)i;
+
     return rc;
 }
 
@@ -343,6 +370,11 @@ static int TPM2_ResponseProcess(TPM2_CTX* ctx, TPM2_Packet* packet,
                     return TPM_RC_HMAC;
                 }
             }
+
+            /* Save off last known HMAC */
+            session->hmac.size = authRsp.hmac.size;
+            XMEMCPY(session->hmac.buffer, authRsp.hmac.buffer,
+                authRsp.hmac.size);
         #else
             (void)cmdCode;
         #endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_HMAC */
@@ -618,7 +650,7 @@ TPM_RC TPM2_Init_ex(TPM2_CTX* ctx, TPM2HalIoCb ioCb, void* userCtx,
     /* Setup HAL IO Callback */
     rc = TPM2_SetHalIoCb(ctx, ioCb, userCtx);
     if (rc != TPM_RC_SUCCESS)
-      return rc;
+        return rc;
 #endif
 
     /* Set the active TPM global */
@@ -855,16 +887,18 @@ TPM_RC TPM2_GetCapability(GetCapability_In* in, GetCapability_Out* out)
             TPM2_Packet_ParseU32(&packet, &out->capabilityData.capability);
 
             switch (out->capabilityData.capability) {
-                case TPM_CAP_TPM_PROPERTIES:
+                case TPM_CAP_ALGS:
                 {
-                    TPML_TAGGED_TPM_PROPERTY* prop =
-                        &out->capabilityData.data.tpmProperties;
-                    TPM2_Packet_ParseU32(&packet, &prop->count);
-                    for (i=0; i<(int)prop->count; i++) {
+                    TPML_ALG_PROPERTY* algorithms =
+                        &out->capabilityData.data.algorithms;
+                    TPM2_Packet_ParseU32(&packet, &algorithms->count);
+                    if (algorithms->count > MAX_CAP_ALGS)
+                        algorithms->count = MAX_CAP_ALGS;
+                    for (i=0; i<(int)algorithms->count; i++) {
+                        TPM2_Packet_ParseU16(&packet,
+                            &algorithms->algProperties[i].alg);
                         TPM2_Packet_ParseU32(&packet,
-                            &prop->tpmProperty[i].property);
-                        TPM2_Packet_ParseU32(&packet,
-                            &prop->tpmProperty[i].value);
+                            &algorithms->algProperties[i].algProperties);
                     }
                     break;
                 }
@@ -873,8 +907,129 @@ TPM_RC TPM2_GetCapability(GetCapability_In* in, GetCapability_Out* out)
                     TPML_HANDLE* handles =
                         &out->capabilityData.data.handles;
                     TPM2_Packet_ParseU32(&packet, &handles->count);
+                    if (handles->count > MAX_CAP_HANDLES)
+                        handles->count = MAX_CAP_HANDLES;
                     for (i=0; i<(int)handles->count; i++) {
                         TPM2_Packet_ParseU32(&packet, &handles->handle[i]);
+                    }
+                    break;
+                }
+                case TPM_CAP_COMMANDS:
+                {
+                    TPML_CCA* cmdAttribs =
+                        &out->capabilityData.data.command;
+                    TPM2_Packet_ParseU32(&packet, &cmdAttribs->count);
+                    if (cmdAttribs->count > MAX_CAP_CC)
+                        cmdAttribs->count = MAX_CAP_CC;
+                    for (i=0; i<(int)cmdAttribs->count; i++) {
+                        TPM2_Packet_ParseU32(&packet,
+                            &cmdAttribs->commandAttributes[i]);
+                    }
+                    break;
+                }
+                case TPM_CAP_PP_COMMANDS:
+                case TPM_CAP_AUDIT_COMMANDS:
+                {
+                    TPML_CC* cmdCodes =
+                        &out->capabilityData.data.ppCommands;
+                    TPM2_Packet_ParseU32(&packet, &cmdCodes->count);
+                    if (cmdCodes->count > MAX_CAP_CC)
+                        cmdCodes->count = MAX_CAP_CC;
+                    for (i=0; i<(int)cmdCodes->count; i++) {
+                        TPM2_Packet_ParseU32(&packet,
+                            &cmdCodes->commandCodes[i]);
+                    }
+                    break;
+                }
+                case TPM_CAP_PCRS:
+                {
+                    TPML_PCR_SELECTION* assignedPCR =
+                        &out->capabilityData.data.assignedPCR;
+                    TPM2_Packet_ParsePCR(&packet, assignedPCR);
+                    break;
+                }
+                case TPM_CAP_TPM_PROPERTIES:
+                {
+                    TPML_TAGGED_TPM_PROPERTY* prop =
+                        &out->capabilityData.data.tpmProperties;
+                    TPM2_Packet_ParseU32(&packet, &prop->count);
+                    if (prop->count > MAX_TPM_PROPERTIES)
+                        prop->count = MAX_TPM_PROPERTIES;
+                    for (i=0; i<(int)prop->count; i++) {
+                        TPM2_Packet_ParseU32(&packet,
+                            &prop->tpmProperty[i].property);
+                        TPM2_Packet_ParseU32(&packet,
+                            &prop->tpmProperty[i].value);
+                    }
+                    break;
+                }
+                case TPM_CAP_PCR_PROPERTIES:
+                {
+                    TPML_TAGGED_PCR_PROPERTY* pcrProp =
+                        &out->capabilityData.data.pcrProperties;
+                    TPM2_Packet_ParseU32(&packet, &pcrProp->count);
+                    if (pcrProp->count > MAX_PCR_PROPERTIES)
+                        pcrProp->count = MAX_PCR_PROPERTIES;
+                    for (i=0; i<(int)pcrProp->count; i++) {
+                        TPMS_TAGGED_PCR_SELECT* sel = &pcrProp->pcrProperty[i];
+                        TPM2_Packet_ParseU32(&packet, &sel->tag);
+                        TPM2_Packet_ParseU8(&packet, &sel->sizeofSelect);
+                        if (sel->sizeofSelect > PCR_SELECT_MAX)
+                            sel->sizeofSelect = PCR_SELECT_MAX;
+                        TPM2_Packet_ParseBytes(&packet, sel->pcrSelect,
+                            sel->sizeofSelect);
+                    }
+                    break;
+                }
+                case TPM_CAP_ECC_CURVES:
+                {
+                    TPML_ECC_CURVE* eccCurves =
+                        &out->capabilityData.data.eccCurves;
+                    TPM2_Packet_ParseU32(&packet, &eccCurves->count);
+                    if (eccCurves->count > MAX_ECC_CURVES)
+                        eccCurves->count = MAX_ECC_CURVES;
+                    for (i=0; i<(int)eccCurves->count; i++) {
+                        TPM2_Packet_ParseU16(&packet,
+                            &eccCurves->eccCurves[i]);
+                    }
+                    break;
+                }
+                case TPM_CAP_AUTH_POLICIES:
+                {
+                    TPML_TAGGED_POLICY* authPol =
+                        &out->capabilityData.data.authPolicies;
+                    TPM2_Packet_ParseU32(&packet, &authPol->count);
+                    if (authPol->count > MAX_TAGGED_POLICIES)
+                        authPol->count = MAX_TAGGED_POLICIES;
+                    for (i=0; i<(int)authPol->count; i++) {
+                        int digSz;
+                        TPMS_TAGGED_POLICY* pol = &authPol->policies[i];
+                        TPM2_Packet_ParseU32(&packet, &pol->handle);
+                        TPM2_Packet_ParseU16(&packet, &pol->policyHash.hashAlg);
+                        digSz = (int)TPM2_GetHashDigestSize(
+                            pol->policyHash.hashAlg);
+                        if (digSz > (int)sizeof(pol->policyHash.digest)) {
+                            digSz = (int)sizeof(pol->policyHash.digest);
+                        }
+                        TPM2_Packet_ParseBytes(&packet,
+                            pol->policyHash.digest.H, digSz);
+                    }
+                    break;
+                }
+                case TPM_CAP_ACT:
+                {
+                    TPML_ACT_DATA* actData =
+                        &out->capabilityData.data.actData;
+                    TPM2_Packet_ParseU32(&packet, &actData->count);
+                    if (actData->count > MAX_ACT_DATA)
+                        actData->count = MAX_ACT_DATA;
+                    for (i=0; i<(int)actData->count; i++) {
+                        TPM2_Packet_ParseU32(&packet,
+                            &actData->actData[i].handle);
+                        TPM2_Packet_ParseU32(&packet,
+                            &actData->actData[i].timeout);
+                        TPM2_Packet_ParseU32(&packet,
+                            &actData->actData[i].attributes);
                     }
                     break;
                 }
@@ -4918,6 +5073,9 @@ TPM_RC TPM2_NV_Extend(NV_Extend_In* in)
         TPM2_Packet_Init(ctx, &packet);
 
         TPM2_Packet_AppendU32(&packet, in->authHandle);
+        /* When using an HMAC or Policy session make sure the NV "name" is
+         * populated in the TPM2_AUTH_SESSION name.name. This is a computed
+         * hash (see TPM2_HashNvPublic) */
         TPM2_Packet_AppendU32(&packet, in->nvIndex);
         TPM2_Packet_AppendAuth(&packet, ctx, &info);
 
@@ -5480,8 +5638,6 @@ int TPM2_IFX_FieldUpgradeCommand(TPM_CC cc, uint8_t* data, uint32_t size)
     }
     return rc;
 }
-
-
 #endif /* WOLFTPM_SLB9672 || WOLFTPM_SLB9673 */
 #endif /* WOLFTPM_FIRMWARE_UPGRADE */
 
@@ -5510,6 +5666,26 @@ int TPM2_GetHashDigestSize(TPMI_ALG_HASH hashAlg)
             break;
     }
     return 0;
+}
+
+TPMI_ALG_HASH TPM2_GetTpmHashType(int hashType)
+{
+#ifndef WOLFTPM2_NO_WOLFCRYPT
+    switch (hashType) {
+        case (int)WC_HASH_TYPE_SHA:
+            return TPM_ALG_SHA1;
+        case (int)WC_HASH_TYPE_SHA256:
+            return TPM_ALG_SHA256;
+        case (int)WC_HASH_TYPE_SHA384:
+            return TPM_ALG_SHA384;
+        case (int)WC_HASH_TYPE_SHA512:
+            return TPM_ALG_SHA512;
+        default:
+            break;
+    }
+#endif
+    (void)hashType;
+    return TPM_ALG_ERROR;
 }
 
 int TPM2_GetHashType(TPMI_ALG_HASH hashAlg)
@@ -5637,6 +5813,7 @@ int TPM2_GetName(TPM2_CTX* ctx, UINT32 handleValue, int handleCnt, int idx, TPM2
     return TPM_RC_SUCCESS;
 }
 
+/* Caller must zeroize/memset(0) pcr (TPML_PCR_SELECTION) */
 void TPM2_SetupPCRSel(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg, int pcrIndex)
 {
     int i = 0;
@@ -5649,21 +5826,35 @@ void TPM2_SetupPCRSel(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg, int pcrIndex)
         else {
             /* iterate over all banks until the alg matches */
             for (i = 0; (word32)i < pcr->count; i++) {
-                if (pcr->pcrSelections[0].hash == alg)
+                if (pcr->pcrSelections[i].hash == alg)
                     break;
             }
 
             /* if no match increase the number of banks */
-            if ((word32)i >= pcr->count)
+            if ((word32)i >= pcr->count) {
+                if (pcr->count + 1 > HASH_COUNT) {
+                #ifdef DEBUG_WOLFTPM
+                    printf("TPM2_SetupPCRSel: Hash algorithm count error\n");
+                #endif
+                    return;
+                }
                 pcr->count++;
+            }
         }
 
         pcr->pcrSelections[i].hash = alg;
         pcr->pcrSelections[i].sizeofSelect = PCR_SELECT_MAX;
-        pcr->pcrSelections[i].pcrSelect[pcrIndex >> 3] = (1 << (pcrIndex & 0x7));
+        pcr->pcrSelections[i].pcrSelect[pcrIndex >> 3] |=
+            (1 << (pcrIndex & 0x7));
     }
+#ifdef DEBUG_WOLFTPM
+    else {
+        printf("Invalid PCR Index %d\n", pcrIndex);
+    }
+#endif
 }
 
+/* Caller must zeroize/memset(0) pcr (TPML_PCR_SELECTION) */
 void TPM2_SetupPCRSelArray(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg,
     byte* pcrArray, word32 pcrArraySz)
 {
@@ -5718,7 +5909,7 @@ const char* TPM2_GetRCString(int rc)
         return "Success";
     }
 
-    if ((rc & RC_WARN) && (rc & RC_FMT1) == 0 && (rc & RC_VER1) == 0) {
+    if ((rc & RC_WARN) == RC_WARN && (rc & RC_FMT1) == 0) {
         int rc_warn = rc & RC_MAX_WARN;
 
         switch (rc_warn) {
@@ -5989,6 +6180,10 @@ int TPM2_GetTpmCurve(int curve_id)
         case ECC_SECP521R1:
             ret = TPM_ECC_NIST_P521;
             break;
+        case ECC_BRAINPOOLP256R1:
+            ret = TPM_ECC_BN_P256;
+            break;
+        case TPM_ECC_BN_P638:
         default:
             ret = ECC_CURVE_OID_E;
     }
@@ -6018,7 +6213,10 @@ int TPM2_GetWolfCurve(int curve_id)
             ret = ECC_SECP521R1;
             break;
         case TPM_ECC_BN_P256:
+            ret = ECC_BRAINPOOLP256R1;
+            break;
         case TPM_ECC_BN_P638:
+        default:
             ret = ECC_CURVE_OID_E;
     }
 #endif

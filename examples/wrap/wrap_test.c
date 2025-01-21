@@ -47,13 +47,6 @@
 /* --- BEGIN Wrapper API Tests -- */
 /******************************************************************************/
 
-static int resetTPM = 0;
-
-void TPM2_Wrapper_SetReset(int reset)
-{
-    resetTPM = reset;
-}
-
 static void usage(void)
 {
     printf("Expected Usage:\n");
@@ -116,7 +109,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
 
 #ifndef WOLFTPM2_NO_WOLFCRYPT
     int tpmDevId = INVALID_DEVID;
-#if defined(HAVE_ECC) || (!defined(NO_RSA) && !defined(NO_ASN))
+#if (defined(HAVE_ECC) || !defined(NO_RSA)) && !defined(NO_ASN)
     word32 idx;
 #endif
 #ifndef NO_RSA
@@ -209,12 +202,6 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
         printf("Found %d persistent handles\n", rc);
     }
 
-    if (resetTPM) {
-        /* reset all content on TPM and reseed */
-        rc = wolfTPM2_Clear(&dev);
-        if (rc != 0) return rc;
-    }
-
     /* unload all transient handles */
     rc = wolfTPM2_UnloadHandles_AllTransient(&dev);
     if (rc != 0) goto exit;
@@ -267,7 +254,11 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
 
     /* Start an authenticated session (salted / unbound) with parameter encryption */
     if (paramEncAlg != TPM_ALG_NULL) {
-        rc = wolfTPM2_StartSession(&dev, &tpmSession, &storageKey, NULL,
+        WOLFTPM2_KEY* bindKey = &storageKey;
+    #ifdef NO_RSA
+        bindKey = NULL; /* cannot bind to key without RSA enabled */
+    #endif
+        rc = wolfTPM2_StartSession(&dev, &tpmSession, bindKey, NULL,
             TPM_SE_HMAC, paramEncAlg);
         if (rc != 0) goto exit;
         printf("TPM2_StartAuthSession: sessionHandle 0x%x\n",
@@ -434,7 +425,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
 #else
     rc = wolfTPM2_UnloadHandle(&dev, &rsaKey.handle);
     if (rc != 0) goto exit;
-#endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_RSA */
+#endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_RSA && !NO_ASN */
 
     /* Load raw RSA public key into TPM */
     rc = wolfTPM2_LoadRsaPublicKey(&dev, &publicKey,
@@ -459,24 +450,38 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != 0) goto exit;
     rc = wolfTPM2_RsaKey_WolfToTpm_ex(&dev, &storageKey, &wolfRsaPrivKey,
         &rsaKey);
-    if (rc != 0) goto exit;
-    /* Use TPM Handle... */
     wc_FreeRsaKey(&wolfRsaPrivKey);
+    if (rc != 0 && rc != NOT_COMPILED_IN) {
+        /* NOT_COMPILED_IN here likely means that AES-CFB is not enabled for
+         * encrypting secrets */
+        goto exit;
+    }
+    printf("RSA Private Key Loaded into TPM: Handle 0x%x\n",
+        (word32)rsaKey.handle.hndl);
+
+    /* Use TPM Handle... */
+
     rc = wolfTPM2_UnloadHandle(&dev, &rsaKey.handle);
     if (rc != 0) goto exit;
+#endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_RSA && !NO_ASN */
 
     /* Load raw RSA private key into TPM */
     rc = wolfTPM2_LoadRsaPrivateKey(&dev, &storageKey, &rsaKey,
         kRsaKeyPubModulus, (word32)sizeof(kRsaKeyPubModulus),
         kRsaKeyPubExponent,
         kRsaKeyPrivQ,      (word32)sizeof(kRsaKeyPrivQ));
-    if (rc != 0) goto exit;
-    /* Use TPM Handle... */
-    printf("RSA Private Key Loaded into TPM: Handle 0x%x\n",
+    if (rc != 0 && rc != NOT_COMPILED_IN) {
+        /* NOT_COMPILED_IN here likely means that AES-CFB is not enabled for
+         * encrypting secrets */
+        goto exit;
+    }
+    printf("RSA Private Key RAW Loaded into TPM: Handle 0x%x\n",
         (word32)rsaKey.handle.hndl);
+
+    /* Use TPM Handle... */
+
     rc = wolfTPM2_UnloadHandle(&dev, &rsaKey.handle);
     if (rc != 0) goto exit;
-#endif /* !WOLFTPM2_NO_WOLFCRYPT && !NO_RSA */
 
     /* Close TPM session based on RSA storage key */
     wolfTPM2_UnloadHandle(&dev, &tpmSession.handle);
@@ -529,7 +534,11 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
 
     /* Start an authenticated session (salted / unbound) with parameter encryption */
     if (paramEncAlg != TPM_ALG_NULL) {
-        rc = wolfTPM2_StartSession(&dev, &tpmSession, &storageKey, NULL,
+        WOLFTPM2_KEY* bindKey = &storageKey;
+    #ifndef HAVE_ECC
+        bindKey = NULL; /* cannot bind to key without ECC enabled */
+    #endif
+        rc = wolfTPM2_StartSession(&dev, &tpmSession, bindKey, NULL,
             TPM_SE_HMAC, paramEncAlg);
         if (rc != 0) goto exit;
         printf("TPM2_StartAuthSession: sessionHandle 0x%x\n",
@@ -620,7 +629,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     /*------------------------------------------------------------------------*/
     /* ECC KEY LOADING TESTS */
     /*------------------------------------------------------------------------*/
-#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC)
+#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC) && !defined(NO_ASN)
     /* Extract an ECC public key from TPM */
     /* Setup wolf ECC key with TPM deviceID, so crypto callbacks
        can be used for private operations */
@@ -635,7 +644,6 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     wc_ecc_free(&wolfEccPrivKey);
     rc = wolfTPM2_UnloadHandle(&dev, &eccKey.handle);
     if (rc != 0) goto exit;
-
 
     /* Load ECC DER public key into TPM */
     rc = wc_ecc_init(&wolfEccPubKey);
@@ -653,7 +661,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
 #else
     rc = wolfTPM2_UnloadHandle(&dev, &eccKey.handle);
     if (rc != 0) goto exit;
-#endif /* !WOLFTPM2_NO_WOLFCRYPT && HAVE_ECC */
+#endif /* !WOLFTPM2_NO_WOLFCRYPT && HAVE_ECC && !NO_ASN */
 
     /* Load raw ECC public key into TPM */
     rc = wolfTPM2_LoadEccPublicKey(&dev, &publicKey, TPM_ECC_NIST_P256,
@@ -666,7 +674,7 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     rc = wolfTPM2_UnloadHandle(&dev, &publicKey.handle);
     if (rc != 0) goto exit;
 
-#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC)
+#if !defined(WOLFTPM2_NO_WOLFCRYPT) && defined(HAVE_ECC) && !defined(NO_ASN)
     /* Load ECC DER Private Key into TPM */
     rc = wc_ecc_init(&wolfEccPrivKey);
     if (rc != 0) goto exit;
@@ -676,15 +684,21 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != 0) goto exit;
     rc = wolfTPM2_EccKey_WolfToTpm_ex(&dev, &storageKey, &wolfEccPrivKey,
         &eccKey);
+    wc_ecc_free(&wolfEccPrivKey);
     if (rc != 0 && rc != NOT_COMPILED_IN) {
-        /* a NOT_COMPILED_IN here likely means the WOLFSSL_PUBLIC_MP is enabled
-         * exposing the mp_ math API's needed for encrypting secrets */
+        /* NOT_COMPILED_IN here likely means the WOLFSSL_PUBLIC_MP is enabled
+         * exposing the mp_ math API's or AES CFB is not enabled.
+         * Both are needed for encrypting secrets */
         goto exit;
     }
+    printf("ECC Private Key Loaded into TPM: Handle 0x%x\n",
+        (word32)eccKey.handle.hndl);
+
     /* Use TPM Handle... */
-    wc_ecc_free(&wolfEccPrivKey);
+
     rc = wolfTPM2_UnloadHandle(&dev, &eccKey.handle);
     if (rc != 0) goto exit;
+#endif /* !WOLFTPM2_NO_WOLFCRYPT && HAVE_ECC && !NO_ASN */
 
     /* Load raw ECC private key into TPM */
     rc = wolfTPM2_LoadEccPrivateKey(&dev, &storageKey, &eccKey, TPM_ECC_NIST_P256,
@@ -692,16 +706,18 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
         kEccKeyPubYRaw, (word32)sizeof(kEccKeyPubYRaw),
         kEccKeyPrivD,   (word32)sizeof(kEccKeyPrivD));
     if (rc != 0 && rc != NOT_COMPILED_IN) {
-        /* a NOT_COMPILED_IN here likely means the WOLFSSL_PUBLIC_MP is enabled
-         * exposing the mp_ math API's needed for encrypting secrets */
+        /* NOT_COMPILED_IN here likely means the WOLFSSL_PUBLIC_MP is enabled
+         * exposing the mp_ math API's or AES CFB is not enabled.
+         * Both are needed for encrypting secrets */
         goto exit;
     }
-    /* Use TPM Handle... */
-    printf("ECC Private Key Loaded into TPM: Handle 0x%x\n",
+    printf("ECC Private Key RAW Loaded into TPM: Handle 0x%x\n",
         (word32)eccKey.handle.hndl);
+
+    /* Use TPM Handle... */
+
     rc = wolfTPM2_UnloadHandle(&dev, &eccKey.handle);
     if (rc != 0) goto exit;
-#endif /* !WOLFTPM2_NO_WOLFCRYPT && HAVE_ECC */
 
 #if 0 /* disabled until ECC Encrypted salt is added */
     /* Close TPM session based on ECC storage key */
@@ -981,7 +997,6 @@ int TPM2_Wrapper_TestArgs(void* userCtx, int argc, char *argv[])
     if (rc != 0) goto exit;
 #endif
 
-
 exit:
 
     if (rc != 0) {
@@ -999,6 +1014,10 @@ exit:
 
     wolfTPM2_Cleanup(&dev);
 
+#ifndef WOLFTPM2_NO_WOLFCRYPT
+    (void)tpmDevId;
+#endif
+
     return rc;
 }
 
@@ -1013,16 +1032,11 @@ int main(int argc, char *argv[])
 {
     int rc = -1;
 
-    if (argc > 1) {
-    #ifndef WOLFTPM2_NO_WRAPPER
-        TPM2_Wrapper_SetReset(1);
-    #endif
-    }
-    (void)argv;
-
 #ifndef WOLFTPM2_NO_WRAPPER
     rc = TPM2_Wrapper_TestArgs(NULL, argc, argv);
 #else
+    (void)argc;
+    (void)argv;
     printf("Wrapper code not compiled in\n");
 #endif
 

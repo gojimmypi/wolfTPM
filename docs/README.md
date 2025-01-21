@@ -63,7 +63,7 @@ cd wolftpm
 make
 ```
 
-For detailed build instructions see [/README.md](/README.md#building).
+For detailed build instructions see [README.md](/README.md#building).
 
 ## Getting Started
 
@@ -73,17 +73,17 @@ To interface with the hardware platform that is running these applications, plea
 
 ### Examples
 
-See [/examples/README.md](/examples/README.md)
+See [examples/README.md](/examples/README.md)
 
 ### Benchmarks
 
-See [/README.md](/README.md#tpm2-benchmarks)
+See [README.md](/README.md#tpm2-benchmarks)
 
 ## wolfTPM Library Design
 
 ### Library Headers
 
-wolfTPM header files are located in [/wolftpm](/wolftpm).
+wolfTPM header files are located in [wolftpm](/wolftpm).
 
 The general header files that should be included from wolfTPM is shown below:
 
@@ -98,17 +98,19 @@ Every example application that is included with wolfTPM includes the `tpm_io.h` 
 
 The `tpm_io.c` file sets up the example HAL IO callback necessary for testing and running the example applications with a Linux Kernel, STM32 CubeMX HAL or Atmel/Microchip ASF. The reference is easily modified, such that custom IO callbacks or different callbacks may be added or removed as desired.
 
+See [hal/README.md](/hal/README.md) for HAL IO callback details.
+
 ## API Reference
 
 See [https://www.wolfssl.com/docs/wolftpm-manual/](https://www.wolfssl.com/docs/wolftpm-manual/).
 
 ### TPM 2.0 TCG API's
 
-See [/wolftpm/tpm2.h](/wolftpm/tpm2.h) for inline doxygen style API documentation.
+See [wolftpm/tpm2.h](/wolftpm/tpm2.h) for inline doxygen style API documentation.
 
 ### wolfTPM Wrapper API's
 
-See [/wolftpm/tpm2_wrap.h](/wolftpm/tpm2_wrap.h) for inline doxygen style API documentation.
+See [wolftpm/tpm2_wrap.h](/wolftpm/tpm2_wrap.h) for inline doxygen style API documentation.
 
 ## Support
 

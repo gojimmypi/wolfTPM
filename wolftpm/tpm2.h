@@ -39,7 +39,7 @@
  * * Windows systems
  * * Hybrid SoC
  * * Linux using /dev/tpm0
- * * Linux using devspi
+ * * Linux using spidev driver
  * * Linux using i2c driver
  *
  * Typically, a wolfTPM developer would use the wolfTPM2 wrappers for quicker development.
@@ -485,7 +485,9 @@ typedef enum {
     TPM_CAP_TPM_PROPERTIES  = 0x00000006,
     TPM_CAP_PCR_PROPERTIES  = 0x00000007,
     TPM_CAP_ECC_CURVES      = 0x00000008,
-    TPM_CAP_LAST            = TPM_CAP_ECC_CURVES,
+    TPM_CAP_AUTH_POLICIES   = 0x00000009,
+    TPM_CAP_ACT             = 0x0000000A,
+    TPM_CAP_LAST            = TPM_CAP_ACT,
 
     TPM_CAP_VENDOR_PROPERTY = 0x00000100,
 } TPM_CAP_T;
@@ -1010,6 +1012,24 @@ typedef struct TPML_TAGGED_POLICY {
     TPMS_TAGGED_POLICY policies[MAX_TAGGED_POLICIES];
 } TPML_TAGGED_POLICY;
 
+/* Authenticated Countdown Timers (ACT): Added v1.59 */
+typedef enum {
+    TPMA_ACT_signaled         = 0x00000001,
+    TPMA_ACT_preserveSignaled = 0x00000002,
+} TPMA_ACT_T;
+typedef UINT32 TPMA_ACT;
+
+typedef struct TPMS_ACT_DATA {
+    TPM_HANDLE handle;
+    UINT32     timeout;
+    TPMA_ACT   attributes;
+} TPMS_ACT_DATA;
+
+typedef struct TPML_ACT_DATA {
+    UINT32        count;
+    TPMS_ACT_DATA actData[MAX_ACT_DATA];
+} TPML_ACT_DATA;
+
 
 /* Capabilities Structures */
 
@@ -1024,6 +1044,7 @@ typedef union TPMU_CAPABILITIES {
     TPML_TAGGED_PCR_PROPERTY pcrProperties; /* TPM_CAP_PCR_PROPERTIES */
     TPML_ECC_CURVE eccCurves; /* TPM_CAP_ECC_CURVES */
     TPML_TAGGED_POLICY authPolicies; /* TPM_CAP_AUTH_POLICIES */
+    TPML_ACT_DATA actData; /* TPM_CAP_ACT - added v1.57 */
     TPM2B_MAX_BUFFER vendor;
 } TPMU_CAPABILITIES;
 
@@ -1531,7 +1552,7 @@ typedef UINT32 TPMA_NV;
 #define TPMA_NV_OWNERWRITE     0x00000002UL
 #define TPMA_NV_AUTHWRITE      0x00000004UL
 #define TPMA_NV_POLICYWRITE    0x00000008UL
-#define TPMA_NV_TPM_NT         0x000000F0UL
+#define TPMA_NV_TPM_NT         0x000000F0UL /* index type see TPM_NT_ */
 #define TPMA_NV_POLICY_DELETE  0x00000400UL
 #define TPMA_NV_WRITELOCKED    0x00000800UL
 #define TPMA_NV_WRITEALL       0x00001000UL
@@ -1621,19 +1642,22 @@ typedef struct TPMS_AUTH_RESPONSE {
 
 /* Implementation specific authorization session information */
 typedef struct TPM2_AUTH_SESSION {
-    /* BEGIN */
-    /* This section should match TPMS_AUTH_COMMAND */
+    /* this section is used for TPMS_AUTH_COMMAND */
     TPMI_SH_AUTH_SESSION sessionHandle;
     TPM2B_NONCE nonceCaller;
     TPMA_SESSION sessionAttributes;
-    TPM2B_AUTH auth;
-    /* END */
+    TPM2B_AUTH hmac;
 
     /* additional auth data required for implementation */
     TPM2B_NONCE nonceTPM;
     TPMT_SYM_DEF symmetric;
     TPMI_ALG_HASH authHash;
     TPM2B_NAME name;
+    TPM2B_AUTH auth;
+    TPM2B_AUTH* bind;
+
+    unsigned int policyAuth : 1; /* if policy auth should be used */
+    unsigned int policyPass : 1;
 } TPM2_AUTH_SESSION;
 
 /* Macros to determine TPM 2.0 Session type */
@@ -1647,18 +1671,128 @@ typedef struct TPM2_AUTH_SESSION {
 #define TPM_20_OWNER_NV_SPACE          ((TPM_HT_NV_INDEX << 24) | (0x02 << 22))
 #define TPM_20_TCG_NV_SPACE            ((TPM_HT_NV_INDEX << 24) | (0x03 << 22))
 
-#define TPM_20_NV_INDEX_EK_CERTIFICATE (TPM_20_PLATFORM_MFG_NV_SPACE + 2)
-#define TPM_20_NV_INDEX_EK_NONCE       (TPM_20_PLATFORM_MFG_NV_SPACE + 3)
-#define TPM_20_NV_INDEX_EK_TEMPLATE    (TPM_20_PLATFORM_MFG_NV_SPACE + 4)
+/* EK (Low Range): RSA 2048 */
+#define TPM2_NV_RSA_EK_CERT            (TPM_20_TCG_NV_SPACE + 0x2)
+#define TPM2_NV_RSA_EK_NONCE           (TPM_20_TCG_NV_SPACE + 0x3)
+#define TPM2_NV_RSA_EK_TEMPLATE        (TPM_20_TCG_NV_SPACE + 0x4)
 
-/* Predetermined TPM 2.0 Endorsement policy auth template for SHA2-256 */
+/* EK (Low Range): ECC P256 */
+#define TPM2_NV_ECC_EK_CERT            (TPM_20_TCG_NV_SPACE + 0xA)
+#define TPM2_NV_ECC_EK_NONCE           (TPM_20_TCG_NV_SPACE + 0xB)
+#define TPM2_NV_ECC_EK_TEMPLATE        (TPM_20_TCG_NV_SPACE + 0xC)
+
+/* EK (High Range) */
+#define TPM2_NV_EK_RSA2048             (TPM_20_TCG_NV_SPACE + 0x12)
+#define TPM2_NV_EK_ECC_P256            (TPM_20_TCG_NV_SPACE + 0x14)
+#define TPM2_NV_EK_ECC_P384            (TPM_20_TCG_NV_SPACE + 0x16)
+#define TPM2_NV_EK_ECC_P521            (TPM_20_TCG_NV_SPACE + 0x18)
+#define TPM2_NV_EK_ECC_SM2             (TPM_20_TCG_NV_SPACE + 0x1A)
+#define TPM2_NV_EK_RSA3072             (TPM_20_TCG_NV_SPACE + 0x1C)
+#define TPM2_NV_EK_RSA4096             (TPM_20_TCG_NV_SPACE + 0x1E)
+
+/* EK Certificate Chains (0x100 - 0x1FF) - Not common */
+#define TPM2_NV_EK_CHAIN               (TPM_20_TCG_NV_SPACE + 0x100)
+
+/* Predetermined TPM 2.0 Endorsement policy auth templates */
+/* SHA256 (Low Range) */
 static const BYTE TPM_20_EK_AUTH_POLICY[] = {
-    0x83, 0x71, 0x97, 0x67, 0x44, 0x84, 0xb3, 0xf8, 0x1a, 0x90, 0xcc,
-    0x8d, 0x46, 0xa5, 0xd7, 0x24, 0xfd, 0x52, 0xd7, 0x6e, 0x06, 0x52,
-    0x0b, 0x64, 0xf2, 0xa1, 0xda, 0x1b, 0x33, 0x14, 0x69, 0xaa,
+    0x83, 0x71, 0x97, 0x67, 0x44, 0x84, 0xB3, 0xF8,
+    0x1A, 0x90, 0xCC, 0x8D, 0x46, 0xA5, 0xD7, 0x24,
+    0xFD, 0x52, 0xD7, 0x6E, 0x06, 0x52, 0x0B, 0x64,
+    0xF2, 0xA1, 0xDA, 0x1B, 0x33, 0x14, 0x69, 0xAA
 };
+/* SHA256 (PolicyB - High Range) */
+static const BYTE TPM_20_EK_AUTH_POLICY_SHA256[] = {
+    0xCA, 0x3D, 0x0A, 0x99, 0xA2, 0xB9, 0x39, 0x06,
+    0xF7, 0xA3, 0x34, 0x24, 0x14, 0xEF, 0xCF, 0xB3,
+    0xA3, 0x85, 0xD4, 0x4C, 0xD1, 0xFD, 0x45, 0x90,
+    0x89, 0xD1, 0x9B, 0x50, 0x71, 0xC0, 0xB7, 0xA0
+};
+#ifdef WOLFSSL_SHA384
+/* SHA384 (PolicyB - High Range) */
+static const BYTE TPM_20_EK_AUTH_POLICY_SHA384[] = {
+    0xB2, 0x6E, 0x7D, 0x28, 0xD1, 0x1A, 0x50, 0xBC,
+    0x53, 0xD8, 0x82, 0xBC, 0xF5, 0xFD, 0x3A, 0x1A,
+    0x07, 0x41, 0x48, 0xBB, 0x35, 0xD3, 0xB4, 0xE4,
+    0xCB, 0x1C, 0x0A, 0xD9, 0xBD, 0xE4, 0x19, 0xCA,
+    0xCB, 0x47, 0xBA, 0x09, 0x69, 0x96, 0x46, 0x15,
+    0x0F, 0x9F, 0xC0, 0x00, 0xF3, 0xF8, 0x0E, 0x12
+};
+#endif
+#ifdef WOLFSSL_SHA512
+/* SHA512 (PolicyB - High Range) */
+static const BYTE TPM_20_EK_AUTH_POLICY_SHA512[] = {
+    0xB8, 0x22, 0x1C, 0xA6, 0x9E, 0x85, 0x50, 0xA4,
+    0x91, 0x4D, 0xE3, 0xFA, 0xA6, 0xA1, 0x8C, 0x07,
+    0x2C, 0xC0, 0x12, 0x08, 0x07, 0x3A, 0x92, 0x8D,
+    0x5D, 0x66, 0xD5, 0x9E, 0xF7, 0x9E, 0x49, 0xA4,
+    0x29, 0xC4, 0x1A, 0x6B, 0x26, 0x95, 0x71, 0xD5,
+    0x7E, 0xDB, 0x25, 0xFB, 0xDB, 0x18, 0x38, 0x42,
+    0x56, 0x08, 0xB4, 0x13, 0xCD, 0x61, 0x6A, 0x5F,
+    0x6D, 0xB5, 0xB6, 0x07, 0x1A, 0xF9, 0x9B, 0xEA
+};
+#endif
 
-
+#ifdef WOLFTPM_PROVISIONING
+/* Precalcualted IDevID/IAK Policies */
+/* PolicyOR:
+ * 1: PolicyUser (section 7.3.6.1)
+ * 2: PolicyCertify (section 7.3.6.2)
+ * 3: PolicyActivateCredential (section 7.3.6.3)
+ * 4: PolicyDelegationNV (section 7.3.6.4)*/
+static const BYTE TPM_20_IDEVID_POLICY[] = {
+    0xAD, 0x6B, 0x3A, 0x22, 0x84, 0xFD, 0x69, 0x8A,
+    0x07, 0x10, 0xBF, 0x5C, 0xC1, 0xB9, 0xBD, 0xF1,
+    0x5E, 0x25, 0x32, 0xE3, 0xF6, 0x01, 0xFA, 0x4B,
+    0x93, 0xA6, 0xA8, 0xFA, 0x8D, 0xE5, 0x79, 0xEA
+};
+static const BYTE TPM_20_IAK_POLICY[] = {
+    0x54, 0x37, 0x18, 0x23, 0x26, 0xE4, 0x14, 0xFC,
+    0xA7, 0x97, 0xD5, 0xF1, 0x74, 0x61, 0x5A, 0x16,
+    0x41, 0xF6, 0x12, 0x55, 0x79, 0x7C, 0x3A, 0x2B,
+    0x22, 0xC2, 0x1D, 0x12, 0x0B, 0x2D, 0x1E, 0x07
+};
+#ifdef WOLFSSL_SHA384
+static const BYTE TPM_20_IDEVID_POLICY_SHA384[] = {
+    0x4D, 0xB1, 0xAA, 0x83, 0x6D, 0x0B, 0x56, 0x15,
+    0xDF, 0x6E, 0xE5, 0x3A, 0x40, 0xEF, 0x70, 0xC6,
+    0x1C, 0x21, 0x7F, 0x43, 0x03, 0xD4, 0x46, 0x95,
+    0x92, 0x59, 0x72, 0xBC, 0x92, 0x70, 0x06, 0xCF,
+    0xA5, 0xCB, 0xDF, 0x6D, 0xC1, 0x8C, 0x4D, 0xBE,
+    0x32, 0x9B, 0x2F, 0x15, 0x42, 0xC3, 0xDD, 0x33
+};
+static const BYTE TPM_20_IAK_POLICY_SHA384[] = {
+    0x12, 0x9D, 0x94, 0xEB, 0xF8, 0x45, 0x56, 0x65,
+    0x2C, 0x6E, 0xEF, 0x43, 0xBB, 0xB7, 0x57, 0x51,
+    0x2A, 0xC8, 0x7E, 0x52, 0xBE, 0x7B, 0x34, 0x9C,
+    0xA6, 0xCE, 0x4D, 0x82, 0x6F, 0x74, 0x9F, 0xCF,
+    0x67, 0x2F, 0x51, 0x71, 0x6C, 0x5C, 0xBB, 0x60,
+    0x5F, 0x31, 0x3B, 0xF3, 0x45, 0xAA, 0xB3, 0x12
+};
+#endif
+#ifdef WOLFSSL_SHA512
+static const BYTE TPM_20_IDEVID_POLICY_SHA512[] = {
+    0x7D, 0xD7, 0x50, 0x0F, 0xD6, 0xC1, 0xB9, 0x4F,
+    0x97, 0xA6, 0xAF, 0x91, 0x0D, 0xA1, 0x47, 0x30,
+    0x1E, 0xF2, 0x8F, 0x66, 0x2F, 0xEE, 0x06, 0xF2,
+    0x25, 0xA4, 0xCC, 0xAD, 0xDA, 0x3B, 0x4E, 0x6B,
+    0x38, 0xE6, 0x6B, 0x2F, 0x3A, 0xD5, 0xDE, 0xE1,
+    0xA0, 0x50, 0x3C, 0xD2, 0xDA, 0xED, 0xB1, 0xE6,
+    0x8C, 0xFE, 0x4F, 0x84, 0xB0, 0x3A, 0x8C, 0xD2,
+    0x2B, 0xB6, 0xA9, 0x76, 0xF0, 0x71, 0xA7, 0x2F
+};
+static const BYTE TPM_20_IAK_POLICY_SHA512[] = {
+    0x80, 0x60, 0xD1, 0xFB, 0x31, 0x71, 0x6A, 0x29,
+    0xE4, 0x8A, 0x6E, 0x5F, 0xEC, 0xE0, 0x88, 0xBC,
+    0xFC, 0x1B, 0x27, 0x8F, 0xC1, 0x62, 0x25, 0x5E,
+    0x81, 0xC3, 0xEC, 0xA3, 0x54, 0x4C, 0xD4, 0x4A,
+    0xF9, 0x44, 0x10, 0xC3, 0x71, 0x5D, 0x56, 0x1C,
+    0xCC, 0xD9, 0xE3, 0x9A, 0x6C, 0xB2, 0x64, 0x6D,
+    0x43, 0x53, 0x5B, 0xB5, 0x4E, 0xA8, 0x87, 0x10,
+    0xDE, 0xB5, 0xF7, 0x83, 0x6B, 0xD9, 0xB5, 0x86
+};
+#endif
+#endif /* WOLFTPM_PROVISIONING */
 
 /* HAL IO Callbacks */
 struct TPM2_CTX;
@@ -2800,7 +2934,8 @@ WOLFTPM_API TPM_RC TPM2_NV_Certify(NV_Certify_In* in, NV_Certify_Out* out);
     } SetCommandSet_In;
     WOLFTPM_API int TPM2_SetCommandSet(SetCommandSet_In* in);
 
-    enum {
+    /* Mode bit-masks for STMicro ST33 */
+    enum TPM_MODE_Vendor_Mask{
         TPMLib_2 = 0x01,
         TPMFips = 0x02,
         TPMLowPowerOff = 0x00,
@@ -3283,6 +3418,28 @@ WOLFTPM_API int TPM2_GetHashType(TPMI_ALG_HASH hashAlg);
 
 /*!
     \ingroup TPM2_Proprietary
+    \brief Translate a wolfCrypt hash type to TPM2 hash type
+
+    \return a TPM2 hash type (TPM_ALG_*)
+    \return TPM_ALG_ERROR when wolfCrypt hash type is invalid or not found
+
+    \param hashType a wolfCrypt hash type
+
+    _Example_
+    \code
+    int wc_hashType = WC_HASH_TYPE_SHA256;
+    TPMI_ALG_HASH hashAlg;
+
+    hashAlg = TPM2_GetHashDigestSize(wc_hashType);
+    if (hashAlg != TPM_ALG_ERROR) {
+        //hashAlg contains a valid TPM2 hash type
+    }
+    \endcode
+*/
+WOLFTPM_API TPMI_ALG_HASH TPM2_GetTpmHashType(int hashType);
+
+/*!
+    \ingroup TPM2_Proprietary
     \brief Generate a fresh nonce of random numbers
     \note Can use the TPM random number generator if WOLFTPM2_USE_HW_RNG is defined
 
@@ -3311,7 +3468,7 @@ WOLFTPM_API int TPM2_GetNonce(byte* nonceBuf, int nonceSz);
     \brief Helper function to prepare a correct PCR selection
             For example, when preparing to create a TPM2_Quote
 
-    \param pcr pointer to a structure of type TPML_PCR_SELECTION
+    \param pcr pointer to a structure of type TPML_PCR_SELECTION. Note: Caller must zeroize/memset(0)
     \param alg value of type TPM_ALG_ID specifying the type of hash algorithm used
     \param pcrIndex value between 0 and 23 specifying the PCR register for use
 
@@ -3319,7 +3476,7 @@ WOLFTPM_API int TPM2_GetNonce(byte* nonceBuf, int nonceSz);
     \code
     int pcrIndex = 16; // This is a PCR register for DEBUG & testing purposes
     PCR_Read_In pcrRead;
-
+    XMEMSET(&pcrRead, 0, sizeof(pcrRead));
     TPM2_SetupPCRSel(&pcrRead.pcrSelectionIn, TPM_ALG_SHA256, pcrIndex);
     \endcode
 
@@ -3336,17 +3493,22 @@ WOLFTPM_API void TPM2_SetupPCRSel(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg,
     \brief Helper function to prepare a correct PCR selection with multiple indices
             For example, when preparing to create a TPM2_Quote
 
-    \param pcr pointer to a structure of type TPML_PCR_SELECTION
+    \param pcr pointer to a structure of type TPML_PCR_SELECTION. Note: Caller must zeroize/memset(0)
     \param alg value of type TPM_ALG_ID specifying the type of hash algorithm used
     \param pcrArray array of values between 0 and 23 specifying the PCR register for use
-    \param pcrArrayLen length of the pcrArray
+    \param pcrArraySz length of the pcrArray
 
     _Example_
     \code
-    int pcrIndex = 16; // This is a PCR register for DEBUG & testing purposes
     PCR_Read_In pcrRead;
+    byte   pcrArray[PCR_SELECT_MAX];
+    word32 pcrArraySz = 0;
 
-    TPM2_SetupPCRSel(&pcrRead.pcrSelectionIn, TPM_ALG_SHA256, pcrIndex);
+    XMEMSET(&pcrRead, 0, sizeof(pcrRead));
+    XMEMSET(pcrArray, 0, sizeof(pcrArray));
+    pcrArray[pcrArraySz++] = 16; // This is a PCR register for DEBUG & testing purposes
+
+    TPM2_SetupPCRSelArray(&pcrRead.pcrSelectionIn, TPM_ALG_SHA256, pcrArray, pcrArraySz);
     \endcode
 
     \sa TPM2_PCR_Read
@@ -3355,7 +3517,7 @@ WOLFTPM_API void TPM2_SetupPCRSel(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg,
     \sa TPM2_Quote
 */
 WOLFTPM_API void TPM2_SetupPCRSelArray(TPML_PCR_SELECTION* pcr, TPM_ALG_ID alg,
-    byte* pcrArray, word32 pcrArrayLen);
+    byte* pcrArray, word32 pcrArraySz);
 
 /*!
     \ingroup TPM2_Proprietary

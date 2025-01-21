@@ -5,11 +5,11 @@ Portable TPM 2.0 project designed for embedded use.
 
 ## Project Features
 
-* This implementation provides all TPM 2.0 API’s in compliance with the specification.
+* This implementation provides all TPM 2.0 API's in compliance with the specification.
 * Wrappers provided to simplify Key Generation/Loading, RSA encrypt/decrypt, ECC sign/verify, ECDH, NV, Hashing/HACM, AES, Sealing/Unsealing, Attestation, PCR Extend/Quote and Secure Root of Trust.
-* Testing done using TPM 2.0 modules from STMicro ST33 (SPI/I2C), Infineon OPTIGA SLB9670/SLB9672, Microchip ATTPM20, Nations Tech Z32H330TC and Nuvoton NPCT650/NPCT750.
+* Testing done using TPM 2.0 modules from STMicro ST33 (SPI/I2C), Infineon OPTIGA SLB9670/SLB9672/SLB9673, Microchip ATTPM20, Nations Tech Z32H330TC/NS350 and Nuvoton NPCT650/NPCT750.
 * wolfTPM uses the TPM Interface Specification (TIS) to communicate either over SPI, or using a memory mapped I/O range.
-* wolfTPM can also use the Linux TPM kernel interface (/dev/tpmX) to talk with any physical TPM on SPI, I2C and even LPC bus.
+* wolfTPM can also use the Linux TPM kernel interface (`/dev/tpmX`) to talk with any physical TPM on SPI, I2C and even LPC bus.
 * Platform support for Raspberry Pi (Linux), MMIO, STM32 with CubeMX, Atmel ASF, Xilinx, QNX Infineon TriCore and Barebox.
 * The design allows for easy portability to different platforms:
     * Native C code designed for embedded use.
@@ -17,7 +17,7 @@ Portable TPM 2.0 project designed for embedded use.
     * No external dependencies.
     * Compact code size and minimal memory use.
 * Includes example code for:
-    * Most TPM2 native API’s
+    * Most TPM2 native API's
     * All TPM2 wrapper API's
     * PKCS 7
     * Certificate Signing Request (CSR)
@@ -27,13 +27,15 @@ Portable TPM 2.0 project designed for embedded use.
     * Attestation (activate and make credential)
     * Benchmarking TPM algorithms and TLS
     * Key Generation (primary, RSA/ECC and symmetric), loading and storing to flash (NV memory)
-    * Sealing and Unsealing data with an RSA key
+    * Sealing and Unsealing data with an RSA key or externally signed policy.
     * Time signed or set
     * PCR read/reset
     * GPIO configure, read and write.
+    * Endorsement Key/Cert retrieval and validation.
 * Parameter encryption support using AES-CFB or XOR.
 * Support for salted unbound authenticated sessions.
 * Support for HMAC Sessions.
+* Support for reading Endorsement certificates (EK Credential Profile).
 
 Note: See [examples/README.md](examples/README.md) for details on using the examples.
 
@@ -64,7 +66,9 @@ Contains hash digests for SHA-1 and SHA-256 with an index 0-23. These hash diges
 This project uses the terms append vs. marshall and parse vs. unmarshall.
 
 Acronyms:
+* HAL: Hardware Abstraction Layer.
 * NV: Non-Volatile memory.
+* TPM: Trusted Platform Module.
 
 ## Platform
 
@@ -72,11 +76,19 @@ The examples in this library are written for use on a Raspberry Pi and use the `
 
 ### IO Callback (HAL)
 
-See the HAL manual in [`hal/README.md] (hal/README.md).
+See the HAL manual in [hal/README.md](hal/README.md).
 
 For interfacing to your hardware interface (SPI/I2C) a single HAL callback is used and configuration on initialization when calling `TPM2_Init` or `wolfTPM2_Init`.
 
-There are HAL examples in `hal` directory for Linux, STM32 CubeMX, Atmel ASF, Xilinx, Infineon TriCore and BareBox.
+There are HAL examples in `hal` directory for:
+
+* Atmel ASF
+* BareBox
+* Espressif ESP-IDF
+* Infineon TriCore
+* Linux
+* STM32 CubeMX
+* Xilinx
 
 We also support an advanced IO option (`--enable-advio`/`WOLFTPM_ADV_IO`), which adds the register and read/write flag as parameter to the IO callback. This is required for I2C support.
 
@@ -88,8 +100,8 @@ Tested with:
     - LetsTrust: Vendor for TPM development boards [http://letstrust.de](http://letstrust.de).
 * STMicro STSAFE-TPM, ST33TPHF2XSPI/2XI2C and ST33KTPM2X (SPI and I2C)
 * Microchip ATTPM20 module
-* Nuvoton NPCT65X or NPCT75x TPM2.0 module
-* Nations Technologies Z32H330 TPM 2.0 module
+* Nuvoton NPCT65X or NPCT75x TPM2.0 modules
+* Nations Technologies Z32H330 or NS350 TPM 2.0 modules
 
 #### Device Identification
 
@@ -121,8 +133,12 @@ Microchip ATTPM20
 TPM2: Caps 0x30000695, Did 0x3205, Vid 0x1114, Rid 0x 1
 Mfg MCHP (3), Vendor , Fw 512.20481 (0), FIPS 140-2 0, CC-EAL4 0
 
-Nations Technologies Inc. TPM 2.0 module
+Nations Technologies Inc. Z32H330 TPM 2.0 module
 Mfg NTZ (0), Vendor Z32H330, Fw 7.51 (419631892), FIPS 140-2 0, CC-EAL4 0
+
+Nations Technologies Inc. NS350 TPM 2.0 module
+TPM2: Caps 0x30000615, Did 0x0701, Vid 0x9999, Rid 0x 1
+Mfg NSG (0), Vendor NS350, Fw 30.30 (0x24042510), FIPS 140-2 1, CC-EAL4 0
 
 Nuvoton NPCT650 TPM2.0
 Mfg NTC (0), Vendor rlsNPCT , Fw 1.3 (65536), FIPS 140-2 0, CC-EAL4 0
@@ -135,7 +151,7 @@ Mfg NTC (0), Vendor NPCT75x"!!4rls, Fw 7.2 (131072), FIPS 140-2 1, CC-EAL4 0
 
 ### Building wolfSSL
 
-```
+```bash
 git clone https://github.com/wolfSSL/wolfssl.git
 cd wolfssl
 ./autogen.sh
@@ -147,9 +163,23 @@ sudo ldconfig
 
 autogen.sh requires: automake and libtool: `sudo apt-get install automake libtool`
 
+### Building wolfSSL with an alternate directory
+
+```bash
+# cd /your-wolfssl-repo
+./autogen.h # as necessary
+./configure --prefix=~/workspace/my_wolfssl_bin --enable-all
+make install
+
+# then for some other library such as wolfTPM:
+
+# cd /your-wolftpm-repo
+./configure --enable-swtpm --with-wolfcrypt=~/workspace/my_wolfssl_bin
+```
+
 ### Build options and defines
 
-```
+```text
 --enable-debug          Add debug code/turns off optimizations (yes|no|verbose|io) - DEBUG_WOLFTPM, WOLFTPM_DEBUG_VERBOSE, WOLFTPM_DEBUG_IO
 --enable-examples       Enable Examples (default: enabled)
 --enable-wrapper        Enable wrapper code (default: enabled) - WOLFTPM2_NO_WRAPPER
@@ -188,7 +218,7 @@ Support for SLB9670 or SLB9672 (SPI) / SLB9673 (I2C)
 
 Build wolfTPM:
 
-```
+```bash
 git clone https://github.com/wolfSSL/wolfTPM.git
 cd wolfTPM
 ./autogen.sh
@@ -196,11 +226,13 @@ cd wolfTPM
 make
 ```
 
+The default is SLB9672/SLB9673 (if I2C). To specify SLB9670 use `--enable-infineon=slb9670`.
+
 ### Building ST ST33
 
 Build wolfTPM:
 
-```
+```bash
 ./autogen.sh
 ./configure --enable-st33 [--enable-i2c]
 make
@@ -210,7 +242,7 @@ make
 
 Build wolfTPM:
 
-```
+```bash
 ./autogen.sh
 ./configure --enable-microchip
 make
@@ -220,29 +252,68 @@ make
 
 Build wolfTPM:
 
-```
+```bash
 ./autogen.sh
 ./configure --enable-nuvoton
 make
 ```
 
+### Building Nations Tech
+
+Use `./configure` with defaults. All TPM 2.0 modules are compatible.
+The Nations NS350 Raspberry Pi TPM 2.0 module uses `/dev/spidev0.0`. The TPM wait states are required (on by default with WOLFTPM_CHECK_WAIT_STATE).
+
+### Building Espressif ESP-IDF
+
+See the wolfTPM-specific settings in the wolfSSL `user_settings.h` file, typically found in `[project]/components/wolfssl/include`.
+
+```bash
+git clone https://github.com/wolfSSL/wolfTPM.git
+cd wolfTPM/IDE/Espressif
+
+# set your path to ESP-IDF, shown here for VisualGDB using v5.2
+WRK_IDF_PATH=/mnt/c/SysGCC/esp32/esp-idf/v5.2
+
+. ${WRK_IDF_PATH}/export.sh
+idf.py build
+```
+
 ### Building for "/dev/tpmX"
 
-This build option allows you to talk to any TPM vendor supported by the Linux TIS kernel driver
+The `--enable-devtpm` or `WOLFTPM_LINUX_DEV` build option allows you to use the Linux supplied TPM (TIS) driver.
 
-Build wolfTPM:
+To specify a different `/dev/tpmX` device use `CFLAGS="-DTPM2_LINUX_DEV=/dev/tpm1"`
 
-```
+```bash
 ./autogen.sh
 ./configure --enable-devtpm
 make
 ```
 
-Note: When using a TPM device through the Linux kernel driver make sure sufficient permissions are given to the application that uses wolfTPM, because the "/dev/tpmX" typically has read-write permissions only for the "tss" user group. Either run wolfTPM examples and your application using sudo or add your user to the "tss" group like this:
+The `TPM2_Init` or `wolfTPM2_Init` calls should use NULL for the HAL IO callback argument. The default HAL IO `TPM2_IoCb` maps to a macro specifying NULL (`#define TPM2_IoCb NULL`) in tpm_io.h for the devtpm option.
+
+By default the `/dev/tpmX` requires sudo permissions to use it. If using the tpm2-tss it will install a "tss" group that you can add permissions to `sudo adduser [username] tss`.
+
+To add your own custom wolfTPM rule for /dev/tpm0 do the following:
+
+1) Create new group and add your user to it (replace "[username]" with yours):
+
+```bash
+sudo addgroup wolftpm
+sudo adduser [username] wolftpm
+sudo chgrp wolftpm /dev/tpm0
+```
+
+2) Create new rule file: `sudo vim /etc/udev/rules.d/wolftpm-udev.rules`
+
+3) Add the following rule to file:
 
 ```
-sudo adduser yourusername tss
+KERNEL=="tpm[0-9]*", TAG+="systemd", MODE="0660", GROUP="wolftpm"
 ```
+
+4) Reboot or reload rules: `sudo udevadm control -R`
+
 
 ### Building for SWTPM
 
@@ -258,7 +329,7 @@ CMake supports compiling in many environments including Visual Studio
 if CMake support is installed. The commands below can be run in
 `Developer Command Prompt`.
 
-```
+```bash
 mkdir build
 cd build
 # to use installed wolfSSL location (library and headers)
@@ -272,6 +343,18 @@ cmake --build .
 ## Running Examples
 
 These examples demonstrate features of a TPM 2.0 module. The examples create RSA and ECC keys in NV for testing using handles defined in `./hal/tpm_io.h`. The PKCS #7 and TLS examples require generating CSR's and signing them using a test script. See `examples/README.md` for details on using the examples. To run the TLS sever and client on same machine you must build with `WOLFTPM_TIS_LOCK` to enable concurrent access protection.
+
+### TPM2 Capabilities
+
+Simple test that gets TPM capabilities and search for any persistent handles.
+
+```
+./examples/wrap/caps
+TPM2 Get Capabilities
+wolfSSL Entering wolfCrypt_Init
+Mfg NSG (0), Vendor NS350, Fw 30.30 (0x24042510), FIPS 140-2 1, CC-EAL4 0
+Found 2 persistent handles
+```
 
 ### TPM2 Wrapper Tests
 
@@ -495,7 +578,7 @@ ECDSA    256 verify        24 ops took 1.031 sec, avg 42.970 ms, 23.272 ops/sec
 ECDHE    256 agree         16 ops took 1.023 sec, avg 63.934 ms, 15.641 ops/sec
 ```
 
-Run on Nations Technologies Inc. TPM 2.0 module at 33MHz:
+Run on Nations Technologies Inc. Z32H330 TPM 2.0 module at 33MHz:
 
 ```
 ./examples/bench/bench
@@ -525,6 +608,43 @@ ECC      256 key gen       20 ops took 1.037 sec, avg 51.871 ms, 19.279 ops/sec
 ECDSA    256 sign          43 ops took 1.006 sec, avg 23.399 ms, 42.736 ops/sec
 ECDSA    256 verify        28 ops took 1.030 sec, avg 36.785 ms, 27.185 ops/sec
 ECDHE    256 agree         26 ops took 1.010 sec, avg 38.847 ms, 25.742 ops/sec
+```
+
+Run on Nations Technologies Inc. NS350 TPM 2.0 module at 33MHz:
+
+```
+./examples/bench/bench
+TPM2 Benchmark using Wrapper API's
+        Use Parameter Encryption: NULL
+RNG                  6 KB took 1.052 seconds,    5.703 KB/s
+Benchmark symmetric AES-128-CBC-enc not supported!
+Benchmark symmetric AES-128-CBC-dec not supported!
+Benchmark symmetric AES-256-CBC-enc not supported!
+Benchmark symmetric AES-256-CBC-dec not supported!
+Benchmark symmetric AES-128-CTR-enc not supported!
+Benchmark symmetric AES-128-CTR-dec not supported!
+Benchmark symmetric AES-256-CTR-enc not supported!
+Benchmark symmetric AES-256-CTR-dec not supported!
+Encrypt/Decrypt unavailable
+AES-128-CFB-enc      0 bytes took 0.005 seconds,    0.000 bytes/s
+Encrypt/Decrypt unavailable
+AES-128-CFB-dec      0 bytes took 0.006 seconds,    0.000 bytes/s
+Encrypt/Decrypt unavailable
+AES-256-CFB-enc      0 bytes took 0.006 seconds,    0.000 bytes/s
+Encrypt/Decrypt unavailable
+AES-256-CFB-dec      0 bytes took 0.005 seconds,    0.000 bytes/s
+SHA1                68 KB took 1.003 seconds,   67.772 KB/s
+SHA256              68 KB took 1.002 seconds,   67.871 KB/s
+SHA384              66 KB took 1.007 seconds,   65.548 KB/s
+RSA     2048 key gen        7 ops took 16.652 sec, avg 2378.893 ms, 0.420 ops/sec
+RSA     2048 Public       126 ops took 1.005 sec, avg 7.980 ms, 125.321 ops/sec
+RSA     2048 Private       20 ops took 1.035 sec, avg 51.735 ms, 19.329 ops/sec
+RSA     2048 Pub  OAEP     81 ops took 1.008 sec, avg 12.443 ms, 80.366 ops/sec
+RSA     2048 Priv OAEP     19 ops took 1.027 sec, avg 54.033 ms, 18.507 ops/sec
+ECC      256 key gen       20 ops took 1.042 sec, avg 52.095 ms, 19.196 ops/sec
+ECDSA    256 sign          60 ops took 1.009 sec, avg 16.816 ms, 59.466 ops/sec
+ECDSA    256 verify        46 ops took 1.008 sec, avg 21.921 ms, 45.618 ops/sec
+ECDHE    256 agree         38 ops took 1.008 sec, avg 26.532 ms, 37.691 ops/sec
 ```
 
 Run on Nuvoton NPCT650:
@@ -783,10 +903,24 @@ Connection: close
 </html>
 ```
 
+## Device Identity and Attestation Keys
+
+The TCG published a specification for TPM manufacture guidance on setting up keys that can be used for device identiy and attestation.
+
+This feature has been tested with the ST33KTPM and is enabled with `WOLFTPM_MFG_IDENTITY`. The ST33KTPM samples are provisioned with a default master password enabled with `TEST_SAMPLE`. To define your own master password use `TPM2_IAK_SAMPLE_MASTER_PASSWORD`. The master password is hashed along with the device serial number to produce authentication for accessing these keys.
+
+The default keys are ECDSA SECP384R1 with SHA2-384 and stored in NV Index defined by `TPM2_IAK_KEY_HANDLE`, `TPM2_IAK_CERT_HANDLE`, `TPM2_IDEVID_KEY_HANDLE` and `TPM2_IDEVID_CERT_HANDLE`.
+
+
+### TPM Endorsement Key Certificates
+
+The TCG EK Credential Profile defines how manufacturers provision endorsement certificates in the TCG NV index range (see TPM_20_TCG_NV_SPACE).
+The `get_ek_certs` example shows how to retrieve those EK cerificates, validate them and create a primary EK handle for signing.
+See `./examples/endorsement/get_ek_certs`.
+
 
 ## Todo
 
-* Add support for Endorsement certificates (EK Credential Profile).
 * Update to v1.59 of specification (adding CertifyX509).
 * Inner wrap support for SensitiveToPrivate.
 * Add support for IRQ (interrupt line)

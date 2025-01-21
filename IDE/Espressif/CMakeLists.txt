@@ -1,14 +1,14 @@
-# wolfSSL Espressif Example Project CMakeLists.txt
+# wolfTPM Espressif Example Project CMakeLists.txt
 #   v1.0
 #
 # The following lines of boilerplate have to be in your project's
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
-# The wolfSSL CMake file should be able to find the source code.
+# The wolfTPM CMake file should be able to find the source code.
 # Otherwise, assign an environment variable or set it here:
 #
-# set(WOLFSSL_ROOT "~/workspace/wolfssl-other-source")
+# set(WOLFTPM_ROOT "~/workspace/wolftpm-other-source")
 #
 # Optional WOLFSSL_CMAKE_SYSTEM_NAME detection to find
 # USE_MY_PRIVATE_CONFIG path for my_private_config.h
@@ -47,7 +47,8 @@ if(APPLE)
 endif()
 # End optional WOLFSSL_CMAKE_SYSTEM_NAME
 
-# Check that there are not conflicting wolfSSL components
+# Check that there are no conflicting wolfSSL components.
+#
 # The ESP Registry Component will be in ./managed_components/wolfssl__wolfssl
 # The local component wolfSSL directory will be in ./components/wolfssl
 if( EXISTS "${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolfssl" AND EXISTS "${CMAKE_HOME_DIRECTORY}/components/wolfssl" )
@@ -66,6 +67,28 @@ if( EXISTS "${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolfssl" AND EXI
                         "or rename the idf_component.yml file typically found in ./main/")
 else()
     message(STATUS "No conflicting wolfSSL components found.")
+endif()
+
+# Check that there are no conflicting wolfTPM components.
+#
+# The ESP Registry Component will be in ./managed_components/wolfssl__wolftpm
+# The local component wolfTPM directory will be in ./components/wolftpm
+if( EXISTS "${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolftpm" AND EXISTS "${CMAKE_HOME_DIRECTORY}/components/wolftpm" )
+    # These exclude statements don't seem to be honored by the $ENV{IDF_PATH}/tools/cmake/project.cmake'
+    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolftpm" EXCLUDE_FROM_ALL)
+    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolftpm/include" EXCLUDE_FROM_ALL)
+    # So we'll error out and let the user decide how to proceed:
+    message(WARNING "\nFound wolfTPM components in\n"
+                    "./managed_components/wolfssl__wolftpm\n"
+                    "and\n"
+                    "./components/wolftpm\n"
+                    "in project directory: \n"
+                    "${CMAKE_HOME_DIRECTORY}")
+    message(FATAL_ERROR "\nPlease use either the ESP Registry Managed Component or the wolfTPM component directory but not both.\n"
+                        "If removing the ./managed_components/wolfssl__wolftpm directory, remember to also remove "
+                        "or rename the idf_component.yml file typically found in ./main/")
+else()
+    message(STATUS "No conflicting wolfTPM components found.")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

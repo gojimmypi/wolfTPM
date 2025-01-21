@@ -132,6 +132,17 @@ typedef int64_t  INT64;
     #define ENCODING_TYPE_ASN1 2 /* CTC_FILETYPE_ASN1 */
     /* end !WOLFTPM2_NO_WOLFCRYPT */
 
+    #ifndef WOLFSSL_HAVE_ECC_KEY_GET_PRIV
+        #define wc_ecc_key_get_priv(key) (&((key)->k))
+        #define WOLFSSL_HAVE_ECC_KEY_GET_PRIV
+    #endif
+
+    #ifndef PRIVATE_KEY_LOCK
+    #define PRIVATE_KEY_LOCK() do {} while (0)
+    #endif
+    #ifndef PRIVATE_KEY_UNLOCK
+    #define PRIVATE_KEY_UNLOCK() do {} while (0)
+    #endif
 #else
     /* wolfTPM is not using wolfCrypt */
 
@@ -187,14 +198,6 @@ typedef int64_t  INT64;
         #define LITTLE_ENDIAN_ORDER
     #endif
 
-    #ifndef OFFSETOF
-        #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 4))
-            #define OFFSETOF(type, field) __builtin_offsetof(type, field)
-        #else
-            #define OFFSETOF(type, field) ((size_t)&(((type *)0)->field))
-        #endif
-    #endif
-
     /* GCC Version */
     #ifndef __GNUC_PREREQ
         #if defined(__GNUC__) && defined(__GNUC_MINOR__)
@@ -238,12 +241,19 @@ typedef int64_t  INT64;
 
 #endif /* !WOLFTPM2_NO_WOLFCRYPT */
 
+#ifndef OFFSETOF
+    #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 4))
+        #define OFFSETOF(type, field) __builtin_offsetof(type, field)
+    #else
+        #define OFFSETOF(type, field) ((size_t)&(((type *)0)->field))
+    #endif
+#endif
+
 #ifndef WOLFTPM_CUSTOM_TYPES
     #include <stdlib.h>
 
-    #define XSTRTOL(s,e,b)    strtol((s),(e),(b))
+    #define XSTRTOUL(s,e,b)   strtoul((s),(e),(b))
     #define XATOI(s)          atoi((s))
-
 #endif
 
 /* make sure file IO macros are available for examples */
@@ -500,16 +510,15 @@ typedef int64_t  INT64;
 /* ---------------------------------------------------------------------------*/
 
 /* Optional delay between polling */
-#if (defined(WOLFTPM_SLB9670) || defined(WOLFTPM_SLB9672)) && !defined(XTPM_WAIT)
-    /* For Infineon SLB9670 and SLB9672 adding 10us delay improves performance
+#if defined(__linux__) && !defined(XTPM_WAIT)
+    /* Avoid excessive polling.
+     * For Infineon SLB9670 and SLB9672 adding 10us delay improves performance
      * and prevents issue with rapid use at higher speeds */
-    #ifdef __linux__
-        #ifndef XTPM_WAIT_POLLING_US
-            #define XTPM_WAIT_POLLING_US 10 /* 0.01ms */
-        #endif
-        #include <unistd.h>
-        #define XTPM_WAIT() usleep(XTPM_WAIT_POLLING_US);
+    #ifndef XTPM_WAIT_POLLING_US
+        #define XTPM_WAIT_POLLING_US 10 /* 0.01ms */
     #endif
+    #include <unistd.h>
+    #define XTPM_WAIT() usleep(XTPM_WAIT_POLLING_US);
 #endif
 #ifndef XTPM_WAIT
     #ifdef WOLFSSL_ESPIDF
@@ -524,6 +533,8 @@ typedef int64_t  INT64;
     #ifdef WIN32
         #include <windows.h>
         #define XSLEEP_MS(ms) Sleep(ms)
+    #elif defined(FREERTOS)
+        #define XSLEEP_MS(ms) vTaskDelay(ms)
     #elif defined(WOLFSSL_ESPIDF)
         #define XSLEEP_MS(ms) vTaskDelay(ms)
     #elif defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 199309L
@@ -709,6 +720,9 @@ typedef int64_t  INT64;
 #ifndef MAX_TAGGED_POLICIES
 #define MAX_TAGGED_POLICIES (MAX_CAP_DATA / sizeof(TPMS_TAGGED_POLICY))
 #endif
+#ifndef MAX_ACT_DATA
+#define MAX_ACT_DATA  (MAX_CAP_DATA / sizeof(TPMS_ACT_DATA))
+#endif
 
 
 /* ---------------------------------------------------------------------------*/
@@ -719,6 +733,7 @@ typedef int64_t  INT64;
 #ifndef WOLFTPM2_WRAP_DIGEST
     #define WOLFTPM2_WRAP_DIGEST TPM_ALG_SHA256
 #endif
+
 /* Defines the default RSA key bits for the wrapper functions */
 #ifndef WOLFTPM2_WRAP_RSA_KEY_BITS
     #define WOLFTPM2_WRAP_RSA_KEY_BITS MAX_RSA_KEY_BITS
@@ -745,15 +760,22 @@ typedef int64_t  INT64;
 #if !defined(WOLFTPM2_NO_HEAP) && defined(WOLFSSL_PEM_TO_DER) && \
     (defined(WOLFSSL_CERT_EXT) || defined(WOLFSSL_PUB_PEM_TO_DER)) && \
     !defined(NO_ASN)
+    /* Enable the certificate PEM decode support */
     #define WOLFTPM2_PEM_DECODE
 #endif
 
-/* Firmware upgrade requires wolfCrypt for hash and supported
- * only for Infineon SLB9672/SLB9673 */
+/* Firmware upgrade requires wolfCrypt for hashing.
+ * Supported only for Infineon SLB9672/SLB9673 */
 #if defined(WOLFTPM_FIRMWARE_UPGRADE) && \
     (defined(WOLFTPM2_NO_WOLFCRYPT) || \
      (!defined(WOLFTPM_SLB9672) && !defined(WOLFTPM_SLB9673)))
     #undef WOLFTPM_FIRMWARE_UPGRADE
+#endif
+
+#if !defined(WOLFTPM2_NO_WOLFCRYPT) && \
+    !defined(NO_AES) && defined(WOLFSSL_AES_CFB) && !defined(NO_HMAC)
+    /* Support for importing external private keys */
+    #define WOLFTPM2_PRIVATE_IMPORT
 #endif
 
 

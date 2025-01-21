@@ -36,12 +36,6 @@
 #include <examples/tpm_test.h>
 #include <examples/tpm_test_keys.h>
 
-#define SYM_EXTRA_OPTS_LEN 14 /* 5 chars for "-sym=" and 9 for extra options */
-#define SYM_EXTRA_OPTS_POS 4  /* Array pos of the equal sign for extra opts */
-#define SYM_EXTRA_OPTS_AES_MODE_POS 8
-#define SYM_EXTRA_OPTS_KEY_BITS_POS 11
-
-
 
 /******************************************************************************/
 /* --- BEGIN TPM Keygen Example -- */
@@ -79,35 +73,22 @@ static void usage(void)
     printf("\t\t keygen -sym=aescbc256 -xor\n");
 }
 
-static int symChoice(const char* arg, TPM_ALG_ID* algSym, int* keyBits,
-                     char* symMode)
+static int symChoice(const char* symMode, TPM_ALG_ID* algSym, int* keyBits)
 {
-    size_t len = XSTRLEN(arg);
-
-    if (len != SYM_EXTRA_OPTS_LEN) {
-        return TPM_RC_FAILURE;
-    }
-    if (XSTRCMP(&arg[SYM_EXTRA_OPTS_POS+1], "aes")) {
-        return TPM_RC_FAILURE;
-    }
-
-    /* Copy string for user information later */
-    XMEMCPY(symMode, &arg[SYM_EXTRA_OPTS_POS+1], 6);
-
-    if (XSTRCMP(&arg[SYM_EXTRA_OPTS_AES_MODE_POS], "cfb") == 0) {
+    if (XSTRNCMP(symMode, "aescfb", 6) == 0) {
         *algSym = TPM_ALG_CFB;
     }
-    else if (XSTRCMP(&arg[SYM_EXTRA_OPTS_AES_MODE_POS], "ctr") == 0) {
+    else if (XSTRNCMP(symMode, "aesctr", 6) == 0) {
         *algSym = TPM_ALG_CTR;
     }
-    else if (XSTRCMP(&arg[SYM_EXTRA_OPTS_AES_MODE_POS], "cbc") == 0) {
+    else if (XSTRNCMP(symMode, "aescbc", 6) == 0) {
         *algSym = TPM_ALG_CBC;
     }
     else {
         return TPM_RC_FAILURE;
     }
 
-    *keyBits = XATOI(&arg[SYM_EXTRA_OPTS_KEY_BITS_POS]);
+    *keyBits = XATOI(&symMode[6]);
     if (*keyBits != 128 && *keyBits != 192 && *keyBits != 256) {
         return TPM_RC_FAILURE;
     }
@@ -127,6 +108,7 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
     WOLFTPM2_KEYBLOB primaryBlob; /* Primary key as WOLFTPM2_KEYBLOB */
     TPMT_PUBLIC publicTemplate;
     TPMI_ALG_PUBLIC alg = TPM_ALG_RSA; /* default, see usage() for options */
+    TPMI_ALG_PUBLIC srkAlg = TPM_ALG_ECC; /* prefer ECC, but allow RSA */
     TPM_ALG_ID algSym = TPM_ALG_CTR; /* default Symmetric Cipher, see usage */
     TPM_ALG_ID paramEncAlg = TPM_ALG_NULL;
     WOLFTPM2_SESSION tpmSession;
@@ -142,12 +124,11 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
     const char *pubFilename = NULL;
 #if !defined(NO_FILESYSTEM) && !defined(NO_WRITE_TEMP_FILES)
     const char *nameFile = "ak.name"; /* Name Digest for attestation purposes */
-    #if !defined(WOLFTPM2_NO_WOLFCRYPT) && !defined(NO_RSA)
+    #if !defined(WOLFTPM2_NO_WOLFCRYPT) && !defined(NO_ASN)
     const char *pemFilename = NULL;
     #endif
 #endif
-    size_t len = 0;
-    char symMode[] = "aesctr";
+    const char* symMode = "aesctr";
 
     if (argc >= 2) {
         if (XSTRCMP(argv[1], "-?") == 0 ||
@@ -156,8 +137,6 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
             usage();
             return 0;
         }
-        if (argv[1][0] != '-')
-            outputFile = argv[1];
     }
     while (argc > 1) {
         if (XSTRCMP(argv[argc-1], "-rsa") == 0) {
@@ -166,20 +145,12 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
         else if (XSTRCMP(argv[argc-1], "-ecc") == 0) {
             alg = TPM_ALG_ECC;
         }
+        else if (XSTRNCMP(argv[argc-1], "-sym=", XSTRLEN("-sym=")) == 0) {
+            symMode = argv[argc-1] + XSTRLEN("-sym=");
+            alg = TPM_ALG_SYMCIPHER;
+            bAIK = 0;
+        }
         else if (XSTRCMP(argv[argc-1], "-sym") == 0) {
-            len = XSTRLEN(argv[argc-1]);
-            if (len >= SYM_EXTRA_OPTS_LEN) {
-                /* Did the user provide specific options? */
-                if (argv[argc-1][SYM_EXTRA_OPTS_POS] == '=') {
-                    rc = symChoice(argv[argc-1], &algSym, &keyBits, symMode);
-                    /* In case of incorrect extra options, abort execution */
-                    if (rc != TPM_RC_SUCCESS) {
-                        usage();
-                        return 0;
-                    }
-                }
-                /* Otherwise, defaults are used: AES CTR, 256 key bits */
-            }
             alg = TPM_ALG_SYMCIPHER;
             bAIK = 0;
         }
@@ -205,7 +176,10 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
         else if (XSTRNCMP(argv[argc-1], "-unique=", XSTRLEN("-unique=")) == 0) {
             uniqueStr = argv[argc-1] + XSTRLEN("-unique=");
         }
-        else if (argv[argc-1][0] == '-') {
+        else if (argv[argc-1][0] != '-') {
+            outputFile = argv[argc-1];
+        }
+        else {
             printf("Warning: Unrecognized option: %s\n", argv[argc-1]);
         }
 
@@ -220,13 +194,24 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
     XMEMSET(&tpmSession, 0, sizeof(tpmSession));
     XMEMSET(&auth, 0, sizeof(auth));
 
+    if (alg == TPM_ALG_RSA)
+        srkAlg = TPM_ALG_RSA;
+    if (alg == TPM_ALG_SYMCIPHER) {
+        rc = symChoice(symMode, &algSym, &keyBits);
+        if (rc != TPM_RC_SUCCESS) {
+            usage();
+            return 0;
+        }
+    }
+
     printf("TPM2.0 Key generation example\n");
     printf("\tKey Blob: %s\n", outputFile);
     printf("\tAlgorithm: %s\n", TPM2_GetAlgName(alg));
-    if(alg == TPM_ALG_SYMCIPHER) {
+    if (alg == TPM_ALG_SYMCIPHER) {
         printf("\t\t %s mode, %d keybits\n", symMode, keyBits);
     }
     printf("\tTemplate: %s\n", bAIK ? "AIK" : "Default");
+    printf("\tSRK: %s\n", TPM2_GetAlgName(srkAlg));
     printf("\tUse Parameter Encryption: %s\n", TPM2_GetAlgName(paramEncAlg));
 
     rc = wolfTPM2_Init(&dev, TPM2_IoCb, userCtx);
@@ -236,17 +221,14 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
     }
 
     if (endorseKey) {
-        /* endorsement is always RSA */
-        rc = wolfTPM2_CreateEK(&dev, &endorse, TPM_ALG_RSA);
+        /* endorsement key (EK) */
+        rc = wolfTPM2_CreateEK(&dev, &endorse, srkAlg);
         endorse.handle.policyAuth = 1; /* EK requires Policy auth, not Password */
         pubFilename = ekPubFile;
         primary = &endorse;
     }
     else {
-        /* SRK: Use RSA or ECC SRK only. Prefer ECC */
-        TPMI_ALG_PUBLIC srkAlg = TPM_ALG_ECC;
-        if (alg == TPM_ALG_RSA)
-            srkAlg = TPM_ALG_RSA;
+        /* storage root key (SRK) */
         rc = getPrimaryStoragekey(&dev, &storage, srkAlg);
         pubFilename = srkPubFile;
         primary = &storage;
@@ -254,8 +236,17 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
     if (rc != 0) goto exit;
 
     if (paramEncAlg != TPM_ALG_NULL) {
+        WOLFTPM2_KEY* bindKey = primary;
+    #ifndef HAVE_ECC
+        if (srkAlg == TPM_ALG_ECC)
+            bindKey = NULL; /* cannot bind to key without ECC enabled */
+    #endif
+    #ifdef NO_RSA
+        if (srkAlg == TPM_ALG_RSA)
+            bindKey = NULL; /* cannot bind to key without RSA enabled */
+    #endif
         /* Start an authenticated session (salted / unbound) with parameter encryption */
-        rc = wolfTPM2_StartSession(&dev, &tpmSession, primary, NULL,
+        rc = wolfTPM2_StartSession(&dev, &tpmSession, bindKey, NULL,
             TPM_SE_HMAC, paramEncAlg);
         if (rc != 0) goto exit;
         printf("HMAC Session: Handle 0x%x\n",
@@ -404,7 +395,7 @@ int TPM2_Keygen_Example(void* userCtx, int argc, char *argv[])
 
     /* Save EK public key as PEM format file to the disk */
 #if !defined(NO_FILESYSTEM) && !defined(NO_WRITE_TEMP_FILES) && \
-    !defined(WOLFTPM2_NO_WOLFCRYPT) && !defined(NO_RSA)
+    !defined(WOLFTPM2_NO_WOLFCRYPT) && !defined(NO_ASN)
     if (pemFiles) {
         byte pem[MAX_RSA_KEY_BYTES];
         word32 pemSz;

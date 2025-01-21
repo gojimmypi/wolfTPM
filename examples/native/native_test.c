@@ -109,7 +109,7 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         ECDH_KeyGen_In ecdh;
         ECDH_ZGen_In ecdhZ;
         EncryptDecrypt2_In encDec;
-        CertifyCreation_In certifyCreationIn;
+        CertifyCreation_In certifyCreation;
         HMAC_In hmac;
         HMAC_Start_In hmacStart;
 #if defined(WOLFTPM_ST33) || defined(WOLFTPM_AUTODETECT)
@@ -149,13 +149,14 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
         ECDH_KeyGen_Out ecdh;
         ECDH_ZGen_Out ecdhZ;
         EncryptDecrypt2_Out encDec;
-        CertifyCreation_Out certifyCreationOut;
+        CertifyCreation_Out certifyCreation;
         HMAC_Out hmac;
         HMAC_Start_Out hmacStart;
         byte maxOutput[MAX_RESPONSE_SIZE];
     } cmdOut;
 
     int pcrCount, pcrIndex, i;
+    TPML_PCR_SELECTION* pcrSel;
     TPML_TAGGED_TPM_PROPERTY* tpmProp;
     TPM_HANDLE handle = TPM_RH_NULL;
     TPM_HANDLE sessionHandle = TPM_RH_NULL;
@@ -341,6 +342,31 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     printf("TPM2_GetCapability: Property FIRMWARE_VERSION_2 0x%08x\n",
         (unsigned int)tpmProp->tpmProperty[0].value);
 
+    /* Get Capability for PCR's */
+    XMEMSET(&cmdIn.cap, 0, sizeof(cmdIn.cap));
+    cmdIn.cap.capability = TPM_CAP_PCRS;
+    cmdIn.cap.property = 0;
+    cmdIn.cap.propertyCount = 1;
+    rc = TPM2_GetCapability(&cmdIn.cap, &cmdOut.cap);
+    if (rc != TPM_RC_SUCCESS) {
+        printf("TPM2_GetCapability failed 0x%x: %s\n", rc,
+            TPM2_GetRCString(rc));
+        goto exit;
+    }
+    pcrSel = &cmdOut.cap.capabilityData.data.assignedPCR;
+    printf("Assigned PCR's:\n");
+    for (pcrCount=0; pcrCount < (int)pcrSel->count; pcrCount++) {
+        printf("\t%s: ", TPM2_GetAlgName(pcrSel->pcrSelections[pcrCount].hash));
+        for (pcrIndex=0;
+             pcrIndex<pcrSel->pcrSelections[pcrCount].sizeofSelect*8;
+             pcrIndex++) {
+            if ((pcrSel->pcrSelections[pcrCount].pcrSelect[pcrIndex/8] &
+                    ((1 << (pcrIndex % 8)))) != 0) {
+                printf(" %d", pcrIndex);
+            }
+        }
+        printf("\n");
+    }
 
     /* Random */
 #if defined(WOLFTPM_ST33) || defined(WOLFTPM_AUTODETECT)
@@ -786,7 +812,8 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     rc = TPM2_CreateLoaded(&cmdIn.createLoaded, &cmdOut.createLoaded);
     if (rc == TPM_RC_SUCCESS) {
         printf("TPM2_CreateLoaded: handle 0x%x pub %d, priv %d\n",
-               (unsigned int)cmdOut.createLoaded.objectHandle, cmdOut.createLoaded.outPublic.size,
+               (unsigned int)cmdOut.createLoaded.objectHandle,
+               cmdOut.createLoaded.outPublic.size,
                cmdOut.createLoaded.outPrivate.size);
         cmdIn.flushCtx.flushHandle = cmdOut.createLoaded.objectHandle;
         TPM2_FlushContext(&cmdIn.flushCtx);
@@ -1242,15 +1269,18 @@ int TPM2_Native_TestArgs(void* userCtx, int argc, char *argv[])
     }
 
     /* Use the RSA key for Encrypt/Decrypt to unit test certifyCreation */
-    cmdIn.certifyCreationIn.signHandle = rsaKey.handle;
-    cmdIn.certifyCreationIn.objectHandle = rsaKey.handle;
-    cmdIn.certifyCreationIn.creationHash.size = rsaKey.creationHash.size;
-    XMEMCPY(cmdIn.certifyCreationIn.creationHash.buffer, rsaKey.creationHash.buffer, cmdIn.certifyCreationIn.creationHash.size);
-    XMEMCPY(&cmdIn.certifyCreationIn.creationTicket, &rsaKey.creationTicket, sizeof(rsaKey.creationTicket));
-    cmdIn.certifyCreationIn.inScheme.scheme = TPM_ALG_RSASSA;
-    cmdIn.certifyCreationIn.inScheme.details.any.hashAlg = TPM_ALG_SHA256;
-    cmdIn.certifyCreationIn.qualifyingData.size = 0; /* optional */
-    rc = TPM2_CertifyCreation(&cmdIn.certifyCreationIn, &cmdOut.certifyCreationOut);
+    cmdIn.certifyCreation.signHandle = rsaKey.handle;
+    cmdIn.certifyCreation.objectHandle = rsaKey.handle;
+    cmdIn.certifyCreation.creationHash.size = rsaKey.creationHash.size;
+    XMEMCPY(cmdIn.certifyCreation.creationHash.buffer, rsaKey.creationHash.buffer, cmdIn.certifyCreation.creationHash.size);
+    XMEMCPY(&cmdIn.certifyCreation.creationTicket, &rsaKey.creationTicket, sizeof(rsaKey.creationTicket));
+    cmdIn.certifyCreation.inScheme.scheme = TPM_ALG_RSASSA;
+    cmdIn.certifyCreation.inScheme.details.any.hashAlg = TPM_ALG_SHA256;
+    /* provide a random nonce from remote server (optional) */
+    cmdIn.certifyCreation.qualifyingData.size = sizeof(keyCreationNonce)-1;
+    XMEMCPY(cmdIn.certifyCreation.qualifyingData.buffer, keyCreationNonce,
+        cmdIn.certifyCreation.qualifyingData.size);
+    rc = TPM2_CertifyCreation(&cmdIn.certifyCreation, &cmdOut.certifyCreation);
     if (rc != TPM_RC_SUCCESS) {
         printf("TPM2_CertifyCreation RSA key failed 0x%x: %s\n", rc,
             TPM2_GetRCString(rc));

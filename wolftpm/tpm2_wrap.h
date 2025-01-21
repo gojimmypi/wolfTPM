@@ -31,10 +31,13 @@
 
 typedef struct WOLFTPM2_HANDLE {
     TPM_HANDLE      hndl;
-    TPM2B_AUTH      auth;       /* Used if policyAuth is not set */
+    TPM2B_AUTH      auth;
     TPMT_SYM_DEF    symmetric;
     TPM2B_NAME      name;
-    int             policyAuth; /* Handle requires Policy, not password Auth */
+
+    /* bit-fields */
+    unsigned int    policyPass : 1;
+    unsigned int    policyAuth : 1; /* Handle requires policy auth */
     unsigned int    nameLoaded : 1; /* flag to indicate if "name" was loaded and computed */
 } WOLFTPM2_HANDLE;
 
@@ -48,6 +51,7 @@ typedef struct WOLFTPM2_SESSION {
     TPM2B_DIGEST    salt;         /* User defined */
     TPMI_ALG_HASH   authHash;
     TPMA_SESSION    sessionAttributes;
+    TPM2B_AUTH*     bind;         /* pointer to bind auth password */
 } WOLFTPM2_SESSION;
 
 typedef struct WOLFTPM2_DEV {
@@ -55,13 +59,27 @@ typedef struct WOLFTPM2_DEV {
     TPM2_AUTH_SESSION session[MAX_SESSION_NUM];
 } WOLFTPM2_DEV;
 
-/* WOLFTPM2_KEYBLOB can be cast to WOLFTPM2_KEY.
- *   Both structures must have "handle" and "pub" as first members */
+/* Public Key with Handle.
+ *   Must have "handle" and "pub" as first members */
 typedef struct WOLFTPM2_KEY {
     WOLFTPM2_HANDLE   handle;
     TPM2B_PUBLIC      pub;
 } WOLFTPM2_KEY;
 
+/* Primary Key - From TPM2_CreatePrimary that include creation hash and ticket.
+ * WOLFTPM2_PKEY can be cast to WOLFTPM2_KEY.
+ *   Must have "handle" and "pub" as first members */
+typedef struct WOLFTPM2_PKEY {
+    WOLFTPM2_HANDLE   handle;
+    TPM2B_PUBLIC      pub;
+
+    TPM2B_DIGEST      creationHash;
+    TPMT_TK_CREATION  creationTicket;
+} WOLFTPM2_PKEY;
+
+/* Private/Public Key:
+ * WOLFTPM2_KEYBLOB can be cast to WOLFTPM2_KEY
+ * Must have "handle" and "pub" as first members */
 typedef struct WOLFTPM2_KEYBLOB {
     WOLFTPM2_HANDLE   handle;
     TPM2B_PUBLIC      pub;
@@ -75,6 +93,7 @@ typedef struct WOLFTPM2_HASH {
 
 typedef struct WOLFTPM2_NV {
     WOLFTPM2_HANDLE handle;
+    TPMA_NV attributes;
 } WOLFTPM2_NV;
 
 typedef struct WOLFTPM2_HMAC {
@@ -92,13 +111,10 @@ typedef struct WOLFTPM2_CSR {
 } WOLFTPM2_CSR;
 #endif
 
-#ifndef WOLFTPM2_MAX_BUFFER
-    #define WOLFTPM2_MAX_BUFFER 2048
-#endif
-
+/* buffer similar to TPM2B_MAX_BUFFER that can be used */
 typedef struct WOLFTPM2_BUFFER {
     int size;
-    byte buffer[WOLFTPM2_MAX_BUFFER];
+    byte buffer[MAX_DIGEST_BUFFER];
 } WOLFTPM2_BUFFER;
 
 typedef enum WOLFTPM2_MFG {
@@ -130,10 +146,6 @@ typedef struct WOLFTPM2_CAPS {
     word16 cc_eal4   : 1; /* Common Criteria EAL4+ */
     word16 req_wait_state : 1; /* requires SPI wait state */
 } WOLFTPM2_CAPS;
-
-/* NV Handles */
-#define TPM2_NV_RSA_EK_CERT 0x01C00002
-#define TPM2_NV_ECC_EK_CERT 0x01C0000A
 
 
 /* Wrapper API's to simplify TPM use */
@@ -491,15 +503,36 @@ WOLFTPM_API int wolfTPM2_SetAuthHandle(WOLFTPM2_DEV* dev, int index, const WOLFT
 
     \param dev pointer to a TPM2_DEV struct
     \param index integer value, specifying the TPM Authorization slot, between zero and three
-    \param tpmSession sessionHandle integer value of TPM_HANDLE type
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
     \param sessionAttributes integer value of type TPMA_SESSION, selecting one or more attributes for the Session
 
     \sa wolfTPM2_SetAuth
     \sa wolfTPM2_SetAuthPassword
     \sa wolfTPM2_SetAuthHandle
+    \sa wolfTPM2_SetSessionHandle
 */
 WOLFTPM_API int wolfTPM2_SetAuthSession(WOLFTPM2_DEV* dev, int index,
     WOLFTPM2_SESSION* tpmSession, TPMA_SESSION sessionAttributes);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Sets a TPM Authorization slot using the provided wolfTPM2 session object
+    \note This wrapper is useful for configuring TPM sessions, e.g. session for parameter encryption
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param index integer value, specifying the TPM Authorization slot, between zero and three
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+
+    \sa wolfTPM2_SetAuth
+    \sa wolfTPM2_SetAuthPassword
+    \sa wolfTPM2_SetAuthHandle
+    \sa wolfTPM2_SetAuthSession
+*/
+WOLFTPM_API int wolfTPM2_SetSessionHandle(WOLFTPM2_DEV* dev, int index,
+    WOLFTPM2_SESSION* tpmSession);
 
 /*!
     \ingroup wolfTPM2_Wrappers
@@ -578,11 +611,39 @@ WOLFTPM_API int wolfTPM2_CreateAuthSession_EkPolicy(WOLFTPM2_DEV* dev,
     \param authSz integer value, specifying the size of the password authorization, in bytes
 
     \sa wolfTPM2_CreateKey
+    \sa wolfTPM2_CreatePrimaryKey_ex
     \sa wolfTPM2_GetKeyTemplate_RSA
     \sa wolfTPM2_GetKeyTemplate_ECC
 */
 WOLFTPM_API int wolfTPM2_CreatePrimaryKey(WOLFTPM2_DEV* dev,
     WOLFTPM2_KEY* key, TPM_HANDLE primaryHandle, TPMT_PUBLIC* publicTemplate,
+    const byte* auth, int authSz);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Single function to prepare and create a TPM 2.0 Primary Key
+    \note TPM 2.0 allows only asymmetric RSA or ECC primary keys. Afterwards, both symmetric and asymmetric keys can be created under a TPM 2.0 Primary Key
+    Typically, Primary Keys are used to create Hierarchies of TPM 2.0 Keys.
+    The TPM uses a Primary Key to wrap the other keys, signing or decrypting.
+
+    \return TPM_RC_SUCCESS: successful
+    \return TPM_RC_FAILURE: generic failure (check TPM IO and TPM return code)
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param pkey pointer to an empty struct of WOLFTPM2_PKEY type including the creation hash and ticket.
+    \param primaryHandle integer value, specifying one of four TPM 2.0 Primary Seeds: TPM_RH_OWNER, TPM_RH_ENDORSEMENT, TPM_RH_PLATFORM or TPM_RH_NULL
+    \param publicTemplate pointer to a TPMT_PUBLIC structure populated manually or using one of the wolfTPM2_GetKeyTemplate_... wrappers
+    \param auth pointer to a string constant, specifying the password authorization for the Primary Key
+    \param authSz integer value, specifying the size of the password authorization, in bytes
+
+    \sa wolfTPM2_CreateKey
+    \sa wolfTPM2_CreatePrimaryKey
+    \sa wolfTPM2_GetKeyTemplate_RSA
+    \sa wolfTPM2_GetKeyTemplate_ECC
+*/
+WOLFTPM_API int wolfTPM2_CreatePrimaryKey_ex(WOLFTPM2_DEV* dev, WOLFTPM2_PKEY* pkey,
+    TPM_HANDLE primaryHandle, TPMT_PUBLIC* publicTemplate,
     const byte* auth, int authSz);
 
 /*!
@@ -1921,9 +1982,62 @@ WOLFTPM_API int wolfTPM2_NVCreateAuthPolicy(WOLFTPM2_DEV* dev, WOLFTPM2_HANDLE* 
     \sa wolfTPM2_NVReadAuth
     \sa wolfTPM2_NVCreateAuth
     \sa wolfTPM2_NVDeleteAuth
+    \sa wolfTPM2_NVWriteAuthPolicy
 */
 WOLFTPM_API int wolfTPM2_NVWriteAuth(WOLFTPM2_DEV* dev, WOLFTPM2_NV* nv,
     word32 nvIndex, byte* dataBuf, word32 dataSz, word32 offset);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Stores user data to a NV Index, at a given offset. Allows using a policy session and PCR's for authentication.
+    \note User data size should be less or equal to the NV Index maxSize specified using wolfTPM2_CreateAuth
+
+    \return TPM_RC_SUCCESS: successful
+    \return TPM_RC_FAILURE: generic failure (check TPM IO and TPM return code)
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+    \param pcrAlg the hash algorithm to use with PCR policy
+    \param pcrArray array of PCR Indexes to use when creating the policy
+    \param pcrArraySz the number of PCR Indexes in the pcrArray
+    \param nv pointer to a populated structure of WOLFTPM2_NV type
+    \param nvIndex integer value, holding an existing NV Index Handle value
+    \param dataBuf pointer to a byte buffer, containing the user data to be written to the TPM's NVRAM
+    \param dataSz integer value, specifying the size of the user data buffer, in bytes
+    \param offset integer value of word32 type, specifying the offset from the NV Index memory start, can be zero
+
+    \sa wolfTPM2_NVReadAuth
+    \sa wolfTPM2_NVCreateAuth
+    \sa wolfTPM2_NVDeleteAuth
+    \sa wolfTPM2_NVWriteAuth
+*/
+WOLFTPM_API int wolfTPM2_NVWriteAuthPolicy(WOLFTPM2_DEV* dev, WOLFTPM2_SESSION* tpmSession,
+    TPM_ALG_ID pcrAlg, byte* pcrArray, word32 pcrArraySz, WOLFTPM2_NV* nv,
+    word32 nvIndex, byte* dataBuf, word32 dataSz, word32 offset);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Extend data to an NV index
+    \note When NV index is read it will return the digest
+
+    \return TPM_RC_SUCCESS: successful
+    \return TPM_RC_FAILURE: generic failure (check TPM IO and TPM return code)
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param nv pointer to a populated structure of WOLFTPM2_NV type
+    \param nvIndex integer value, holding an existing NV Index Handle value
+    \param dataBuf pointer to a byte buffer, containing the user data to be written to the TPM's NVRAM
+    \param dataSz integer value, specifying the size of the user data buffer, in bytes
+
+    \sa wolfTPM2_NVReadAuth
+    \sa wolfTPM2_NVCreateAuth
+    \sa wolfTPM2_NVOpen
+    \sa wolfTPM2_NVDeleteAuth
+*/
+WOLFTPM_API int wolfTPM2_NVExtend(WOLFTPM2_DEV* dev, WOLFTPM2_NV* nv,
+    word32 nvIndex, byte* dataBuf, word32 dataSz);
 
 /*!
     \ingroup wolfTPM2_Wrappers
@@ -1944,10 +2058,57 @@ WOLFTPM_API int wolfTPM2_NVWriteAuth(WOLFTPM2_DEV* dev, WOLFTPM2_NV* nv,
     \sa wolfTPM2_NVWriteAuth
     \sa wolfTPM2_NVCreateAuth
     \sa wolfTPM2_NVDeleteAuth
+    \sa wolfTPM2_NVReadAuthPolicy
 */
 WOLFTPM_API int wolfTPM2_NVReadAuth(WOLFTPM2_DEV* dev, WOLFTPM2_NV* nv,
     word32 nvIndex, byte* dataBuf, word32* pDataSz, word32 offset);
 
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Reads user data from a NV Index, starting at the given offset. Allows using a policy session and PCR's for authentication.
+    \note User data size should be less or equal to the NV Index maxSize specified using wolfTPM2_CreateAuth
+
+    \return TPM_RC_SUCCESS: successful
+    \return TPM_RC_FAILURE: generic failure (check TPM IO and TPM return code)
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+    \param pcrAlg the hash algorithm to use with PCR policy
+    \param pcrArray array of PCR Indexes to use when creating the policy
+    \param pcrArraySz the number of PCR Indexes in the pcrArray
+    \param nv pointer to a populated structure of WOLFTPM2_NV type
+    \param nvIndex integer value, holding an existing NV Index Handle value
+    \param dataBuf pointer to an empty byte buffer, used to store the read data from the TPM's NVRAM
+    \param pDataSz pointer to an integer variable, used to store the size of the data read from NVRAM, in bytes
+    \param offset integer value of word32 type, specifying the offset from the NV Index memory start, can be zero
+
+    \sa wolfTPM2_NVWriteAuth
+    \sa wolfTPM2_NVCreateAuth
+    \sa wolfTPM2_NVDeleteAuth
+    \sa wolfTPM2_NVReadAuth
+*/
+WOLFTPM_API int wolfTPM2_NVReadAuthPolicy(WOLFTPM2_DEV* dev, WOLFTPM2_SESSION* tpmSession,
+    TPM_ALG_ID pcrAlg, byte* pcrArray, word32 pcrArraySz, WOLFTPM2_NV* nv,
+    word32 nvIndex, byte* dataBuf, word32* pDataSz, word32 offset);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Helper to get size of NV and read buffer without authentication. Typically used for reading a certificate from an NV.
+
+    \return TPM_RC_SUCCESS: successful
+    \return TPM_RC_FAILURE: generic failure (check TPM IO and TPM return code)
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param handle integer value, holding an existing NV Index Handle value
+    \param buffer pointer to an empty byte buffer, used to store the read data from the TPM's NVRAM
+    \param len pointer to an integer variable, used to store the size of the data read from NVRAM, in bytes
+
+    \sa wolfTPM2_NVWriteAuth
+    \sa wolfTPM2_NVCreateAuth
+    \sa wolfTPM2_NVDeleteAuth
+*/
 WOLFTPM_API int wolfTPM2_NVReadCert(WOLFTPM2_DEV* dev, TPM_HANDLE handle,
     uint8_t* buffer, uint32_t* len);
 
@@ -2579,6 +2740,46 @@ WOLFTPM_API int wolfTPM2_GetKeyTemplate_KeySeal(TPMT_PUBLIC* publicTemplate, TPM
 
 /*!
     \ingroup wolfTPM2_Wrappers
+    \brief Prepares a TPM public template for generating the TPM Endorsement Key
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param publicTemplate pointer to an empty structure of TPMT_PUBLIC type, to store the new template
+    \param alg can be only TPM_ALG_RSA or TPM_ALG_ECC, see Note above
+    \param keyBits integer value, specifying bits for the key, typically 2048 (RSA) or 256 (ECC)
+    \param curveID use one of the accepted TPM_ECC_CURVE values like TPM_ECC_NIST_P256 (only used when alg=TPM_ALG_ECC)
+    \param nameAlg integer value of TPMI_ALG_HASH type, specifying a valid TPM2 hashing algorithm (typically TPM_ALG_SHA256)
+    \param highRange integer value: 0=low range, 1=high range
+
+    \sa wolfTPM2_GetKeyTemplate_ECC_EK
+    \sa wolfTPM2_GetKeyTemplate_RSA_SRK
+    \sa wolfTPM2_GetKeyTemplate_RSA_AIK
+    \sa wolfTPM2_GetKeyTemplate_EKIndex
+*/
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_EK(TPMT_PUBLIC* publicTemplate, TPM_ALG_ID alg,
+    int keyBits, TPM_ECC_CURVE curveID, TPM_ALG_ID nameAlg, int highRange);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+    \brief Helper to get the Endorsement public key template by NV index
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param nvIndex handle for NV index. Typically starting from TPM_20_TCG_NV_SPACE
+    \param publicTemplate pointer to an empty structure of TPMT_PUBLIC type, to store the new template
+
+    \sa wolfTPM2_GetKeyTemplate_EK
+    \sa wolfTPM2_GetKeyTemplate_ECC_EK
+    \sa wolfTPM2_GetKeyTemplate_RSA_SRK
+    \sa wolfTPM2_GetKeyTemplate_RSA_AIK
+*/
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_EKIndex(word32 nvIndex,
+    TPMT_PUBLIC* publicTemplate);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
     \brief Prepares a TPM public template for generating the TPM Endorsement Key of RSA type
 
     \return TPM_RC_SUCCESS: successful
@@ -2586,6 +2787,7 @@ WOLFTPM_API int wolfTPM2_GetKeyTemplate_KeySeal(TPMT_PUBLIC* publicTemplate, TPM
 
     \param publicTemplate pointer to an empty structure of TPMT_PUBLIC type, to store the new template
 
+    \sa wolfTPM2_GetKeyTemplate_EK
     \sa wolfTPM2_GetKeyTemplate_ECC_EK
     \sa wolfTPM2_GetKeyTemplate_RSA_SRK
     \sa wolfTPM2_GetKeyTemplate_RSA_AIK
@@ -2601,6 +2803,7 @@ WOLFTPM_API int wolfTPM2_GetKeyTemplate_RSA_EK(TPMT_PUBLIC* publicTemplate);
 
     \param publicTemplate pointer to an empty structure of TPMT_PUBLIC type, to store the new template
 
+    \sa wolfTPM2_GetKeyTemplate_EK
     \sa wolfTPM2_GetKeyTemplate_RSA_EK
     \sa wolfTPM2_GetKeyTemplate_ECC_SRK
     \sa wolfTPM2_GetKeyTemplate_ECC_AIK
@@ -2664,6 +2867,18 @@ WOLFTPM_API int wolfTPM2_GetKeyTemplate_RSA_AIK(TPMT_PUBLIC* publicTemplate);
     \sa wolfTPM2_GetKeyTemplate_ECC_SRK
 */
 WOLFTPM_API int wolfTPM2_GetKeyTemplate_ECC_AIK(TPMT_PUBLIC* publicTemplate);
+
+#ifdef WOLFTPM_PROVISIONING
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_RSA_IAK(TPMT_PUBLIC* publicTemplate, int keyBits,
+    TPM_ALG_ID hashAlg);
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_ECC_IAK(TPMT_PUBLIC* publicTemplate,
+    TPM_ECC_CURVE curveID, TPM_ALG_ID hashAlg);
+
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_ECC_IDevID(TPMT_PUBLIC* publicTemplate,
+    TPM_ECC_CURVE curveID, TPM_ALG_ID hashAlg);
+WOLFTPM_API int wolfTPM2_GetKeyTemplate_RSA_IDevID(TPMT_PUBLIC* publicTemplate, int keyBits,
+    TPM_ALG_ID hashAlg);
+#endif /* WOLFTPM_PROVISIONING */
 
 /*!
     \ingroup wolfTPM2_Wrappers
@@ -3558,6 +3773,30 @@ WOLFTPM_API int wolfTPM2_PolicyPCRMake(TPM_ALG_ID pcrAlg,
 /*!
     \ingroup wolfTPM2_Wrappers
 
+    \brief Utility for creating a policy hash.
+    Generic helper that takes command code and input array.
+    policyDigestnew = hash(policyDigestOld || [cc] || [Input])
+
+    \return TPM_RC_SUCCESS: successful
+    \return INPUT_SIZE_E: policyDigestSz is too small to hold the returned digest
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param hashAlg the hash algorithm to use with pcr policy
+    \param digest input/out digest (input "old" / output "new")
+    \param digestSz input/out digest size
+    \param cc is the command code used
+    \param input pointer to a array to use (optional)
+    \param inputSz size of input
+
+    \sa wolfTPM2_PolicyPCRMake
+*/
+WOLFTPM_API int wolfTPM2_PolicyHash(TPM_ALG_ID hashAlg,
+    byte* digest, word32* digestSz, TPM_CC cc,
+    const byte* input, word32 inputSz);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+
     \brief Utility for generating a policy authorization digest based on a public key
 
     \return TPM_RC_SUCCESS: successful
@@ -3572,23 +3811,91 @@ WOLFTPM_API int wolfTPM2_PolicyPCRMake(TPM_ALG_ID pcrAlg,
     \param policyRefSz optional nonce size
 
     \sa wolfTPM2_PolicyPCRMake
-    \sa wolfTPM2_PolicyPCRMake
+    \sa wolfTPM2_PolicyHash
 */
 WOLFTPM_API int wolfTPM2_PolicyAuthorizeMake(TPM_ALG_ID pcrAlg,
     const TPM2B_PUBLIC* pub, byte* digest, word32* digestSz,
     const byte* policyRef, word32 policyRefSz);
 
+/*!
+    \ingroup wolfTPM2_Wrappers
 
-/* pre-provisioned IAK and IDevID key/cert from TPM vendor */
+    \brief Wrapper for setting a policy password and calling TPM2_PolicyPassword.
+    This will set a password (in clear) for the policy session instead of HMAC.
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+    \param auth pointer to a string constant, specifying the password authorization for the policy session
+    \param authSz integer value, specifying the size of the password authorization, in bytes
+
+    \sa wolfTPM2_PolicyAuthValue
+    \sa wolfTPM2_PolicyCommandCode
+*/
+WOLFTPM_API int wolfTPM2_PolicyPassword(WOLFTPM2_DEV* dev,
+    WOLFTPM2_SESSION* tpmSession, const byte* auth, int authSz);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+
+    \brief Wrapper for setting a policy auth value that is added to the HMAC key for a policy session.
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+    \param auth pointer to a string constant, specifying the password authorization for the policy session
+    \param authSz integer value, specifying the size of the password authorization, in bytes
+
+    \sa wolfTPM2_PolicyPassword
+    \sa wolfTPM2_PolicyCommandCode
+*/
+WOLFTPM_API int wolfTPM2_PolicyAuthValue(WOLFTPM2_DEV* dev,
+    WOLFTPM2_SESSION* tpmSession, const byte* auth, int authSz);
+
+/*!
+    \ingroup wolfTPM2_Wrappers
+
+    \brief Wrapper for setting a policy command code
+
+    \return TPM_RC_SUCCESS: successful
+    \return BAD_FUNC_ARG: check the provided arguments
+
+    \param dev pointer to a TPM2_DEV struct
+    \param tpmSession pointer to a WOLFTPM2_SESSION struct used with wolfTPM2_StartSession and wolfTPM2_SetAuthSession
+    \param cc TPM_CC command code
+
+    \sa wolfTPM2_PolicyPassword
+    \sa wolfTPM2_PolicyAuthValue
+*/
+WOLFTPM_API int wolfTPM2_PolicyCommandCode(WOLFTPM2_DEV* dev,
+    WOLFTPM2_SESSION* tpmSession, TPM_CC cc);
+
+
+/* Pre-provisioned IAK and IDevID key/cert from TPM vendor */
+/* Tested with ST33KTPM devices */
+/* Default assumes: ECDSA SECP384R1, SHA2-384 */
 #ifdef WOLFTPM_MFG_IDENTITY
 
-/* Initial attestation key (IAK) and an initial device ID (IDevID) */
-/* Default is: ECDSA SECP384P1, SHA2-384 */
-#define TPM2_IAK_KEY_HANDLE     0x81080000
-#define TPM2_IAK_CERT_HANDLE    0x1C20100
-
-#define TPM2_IDEVID_KEY_HANDLE  0x81080001
-#define TPM2_IDEVID_CERT_HANDLE 0x1C20101
+/* Initial Attestation Key (IAK):
+ * Restrictive: Can only sign data generated by the TPM like a TPM2_Quote */
+#ifndef TPM2_IAK_KEY_HANDLE
+#define TPM2_IAK_KEY_HANDLE     0x81020001
+#endif
+#ifndef TPM2_IAK_CERT_HANDLE
+#define TPM2_IAK_CERT_HANDLE    0x1C90100
+#endif
+/* Initial Device ID (IDevID):
+ * Non-Restrictive: Can sign external data */
+#ifndef TPM2_IDEVID_KEY_HANDLE
+#define TPM2_IDEVID_KEY_HANDLE  0x81020000
+#endif
+#ifndef TPM2_IDEVID_CERT_HANDLE
+#define TPM2_IDEVID_CERT_HANDLE 0x1C90200
+#endif
 
 WOLFTPM_API int wolfTPM2_SetIdentityAuth(WOLFTPM2_DEV* dev, WOLFTPM2_HANDLE* handle,
     uint8_t* masterPassword, uint16_t masterPasswordSz);
@@ -3623,6 +3930,7 @@ WOLFTPM_API int wolfTPM2_FirmwareUpgradeRecover(WOLFTPM2_DEV* dev,
 WOLFTPM_API int wolfTPM2_FirmwareUpgradeCancel(WOLFTPM2_DEV* dev);
 
 #endif /* WOLFTPM_FIRMWARE_UPGRADE */
+
 
 #ifdef __cplusplus
     }  /* extern "C" */

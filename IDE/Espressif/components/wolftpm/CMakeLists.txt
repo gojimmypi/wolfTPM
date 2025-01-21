@@ -2,14 +2,14 @@
 #
 #  Copyright (C) 2006-2024 wolfSSL Inc.
 #
-#  This file is part of wolfSSL.
+#  This file is part of wolfTPM.
 #
-#  wolfSSL is free software; you can redistribute it and/or modify
+#  wolfTPM is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
 #  (at your option) any later version.
 #
-#  wolfSSL is distributed in the hope that it will be useful,
+#  wolfTPM is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
@@ -35,8 +35,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWOLFSSL_USER_SETTINGS -DWOLFTPM_USER_SETTI
 set(CMAKE_CURRENT_SOURCE_DIR ".")
 set(COMPONENT_REQUIRES wolfssl driver) # "driver" includes the I2C API
 
-# Optionally set your source to wolfSSL in your project CMakeLists.txt like this:
-# set(WOLFTPM_ROOT "c:/test/my_wolfssl" )
+# Optionally set your source to wolfTPM in your project CMakeLists.txt like this:
+# set(WOLFTPM_ROOT "c:/test/my_wolftpm" )
 
 if ( "${WOLFTPM_ROOT}" STREQUAL "")
     set(WOLFTPM_ROOT "$ENV{WOLFTPM_ROOT}" )
@@ -73,25 +73,25 @@ endif() # End optional WOLFSSL_CMAKE_SYSTEM_NAME
 
 message(STATUS "CONFIG_TARGET_PLATFORM = ${CONFIG_TARGET_PLATFORM}")
 
-# Check that there are not conflicting wolfSSL components
-# The ESP Registry Component will be in ./managed_components/wolfssl__wolfssl
-# The local component wolfSSL directory will be in ./components/wolfssl
-if( EXISTS "${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolfssl" AND EXISTS "${CMAKE_HOME_DIRECTORY}/components/wolfssl" )
+# Check that there are no conflicting wolfTPM components
+# The ESP Registry Component will be in ./managed_components/wolftpm__wolftpm
+# The local component wolfTPM directory will be in ./components/wolftpm
+if( EXISTS "${CMAKE_HOME_DIRECTORY}/managed_components/wolftpm__wolftpm" AND EXISTS "${CMAKE_HOME_DIRECTORY}/components/wolftpm" )
     # These exclude statements don't seem to be honored by the $ENV{IDF_PATH}/tools/cmake/project.cmake'
-    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolfssl" EXCLUDE_FROM_ALL)
-    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolfssl__wolfssl/include" EXCLUDE_FROM_ALL)
+    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolftpm__wolftpm" EXCLUDE_FROM_ALL)
+    # add_subdirectory("${CMAKE_HOME_DIRECTORY}/managed_components/wolftpm__wolftpm/include" EXCLUDE_FROM_ALL)
     # So we'll error out and let the user decide how to proceed:
-    message(WARNING "\nFound wolfSSL components in\n"
-                    "./managed_components/wolfssl__wolfssl\n"
+    message(WARNING "\nFound wolfTPM components in\n"
+                    "./managed_components/wolftpm__wolftpm\n"
                     "and\n"
-                    "./components/wolfssl\n"
+                    "./components/wolftpm\n"
                     "in project directory: \n"
                     "${CMAKE_HOME_DIRECTORY}")
-    message(FATAL_ERROR "\nPlease use either the ESP Registry Managed Component or the wolfSSL component directory but not both.\n"
-                        "If removing the ./managed_components/wolfssl__wolfssl directory, remember to also remove "
+    message(FATAL_ERROR "\nPlease use either the ESP Registry Managed Component or the wolfTPM component directory but not both.\n"
+                        "If removing the ./managed_components/wolftpm__wolftpm directory, remember to also remove "
                         "or rename the idf_component.yml file typically found in ./main/")
 else()
-    message(STATUS "No conflicting wolfSSL components found.")
+    message(STATUS "No conflicting wolfTPM components found.")
 endif()
 
 
@@ -124,24 +124,24 @@ else()
     string(REPLACE "\\" "/" THIS_IDF_PATH "$ENV{IDF_PATH}")
 endif()
 
-# COMPONENT_NAME = wolfssl
+# COMPONENT_NAME = wolftpm
 # The component name is the directory name. "No feature to change this".
 # See https://github.com/espressif/esp-idf/issues/8978#issuecomment-1129892685
 
-# set the root of wolfSSL in top-level project CMakelists.txt:
+# set the root of wolftpm in top-level project CMakelists.txt:
 #   set(WOLFTPM_ROOT  "C:/some path/with/spaces")
 #   set(WOLFTPM_ROOT  "c:/workspace/wolftpm-[username]")
 #   set(WOLFTPM_ROOT  "/mnt/c/some path/with/spaces")
 #   or use this logic to assign value from Environment Variable WOLFTPM_ROOT,
 #   or assume this is an example 7 subdirectories below:
 
-# We are typically in [root]/IDE/Espressif/ESP-IDF/examples/wolfssl_test/components/wolfssl
-# The root of wolfSSL is 7 directories up from here:
+# We are typically in [root]/IDE/Espressif/components/wolftpm
+# The root of wolfTPM is 4 directories up from here:
 
-# function: IS_WOLFSSL_SOURCE
+# function: IS_WOLFTPM_SOURCE
 #  parameter: DIRECTORY_PARAMETER - the directory to test
-#  output:    RESULT = contains contents of DIRECTORY_PARAMETER for wolfssl directory, otherwise blank.
-function(IS_WOLFSSL_SOURCE DIRECTORY_PARAMETER RESULT)
+#  output:    RESULT = contains contents of DIRECTORY_PARAMETER for wolftpm directory, otherwise blank.
+function(IS_WOLFTPM_SOURCE DIRECTORY_PARAMETER RESULT)
     if (EXISTS "${DIRECTORY_PARAMETER}/wolftpm/tpm2.h")
         set(${RESULT} "${DIRECTORY_PARAMETER}" PARENT_SCOPE)
     else()
@@ -165,7 +165,7 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
             message(STATUS "The WOLFTPM_ROOT environment variable is not set. Searching...")
         else()
             get_filename_component(CURRENT_SEARCH_DIR "$ENV{WOLFTPM_ROOT}" ABSOLUTE)
-            IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
+            IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
             if( FOUND_WOLFTPM )
                 message(STATUS "Found WOLFTPM_ROOT via Environment Variable:")
             else()
@@ -175,7 +175,7 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
         endif()
     else()
         get_filename_component(CURRENT_SEARCH_DIR "${${OUTPUT_FOUND_WOLFTPM_DIRECTORY}}" ABSOLUTE)
-        IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
+        IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
         if( FOUND_WOLFTPM )
             message(STATUS "Found WOLFTPM_ROOT via prior specification.")
         else()
@@ -184,19 +184,19 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
     endif()
 
 
-    # we'll start in the CMAKE_CURRENT_SOURCE_DIR, typically [something]/projectname/components/wolfssl
+    # we'll start in the CMAKE_CURRENT_SOURCE_DIR, typically [something]/projectname/components/wolftpm
     message(STATUS "CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR}")
     get_filename_component(CURRENT_SEARCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
     message(STATUS "CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
     string(LENGTH ${CURRENT_SEARCH_DIR} CURRENT_SEARCH_DIR_LENGTH)
 
-    # loop through all the parents, looking for wolfssl
+    # loop through all the parents, looking for wolftpm
     while(NOT CURRENT_SEARCH_DIR STREQUAL "/" AND NOT CURRENT_SEARCH_DIR STREQUAL "" )
         string(LENGTH ${CURRENT_SEARCH_DIR} CURRENT_SEARCH_DIR_LENGTH)
-        # wolfSSL may simply be in a parent directory, such as for local examples in wolfssl repo
-        IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
+        # wolftpm may simply be in a parent directory, such as for local examples in wolftpm repo
+        IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR}" FOUND_WOLFTPM)
         if( FOUND_WOLFTPM )
-            message(STATUS "Found wolfssl in CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
+            message(STATUS "Found wolftpm in CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
             set(${OUTPUT_FOUND_WOLFTPM_DIRECTORY} ${CURRENT_SEARCH_DIR} PARENT_SCOPE)
             return()
         endif()
@@ -207,9 +207,9 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
             set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolftpm-${THIS_USER})
             message(STATUS "Looking in ${CURRENT_SEARCH_DIR_ALT}")
 
-            IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
+            IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
             if ( FOUND_WOLFTPM )
-                message(STATUS "Found wolfssl in user-suffix CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
+                message(STATUS "Found wolftpm in user-suffix CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
                 set(CURRENT_SEARCH_DIR "${CURRENT_SEARCH_DIR_ALT}")
                 set(${OUTPUT_FOUND_WOLFTPM_DIRECTORY} ${CURRENT_SEARCH_DIR} PARENT_SCOPE)
                 return()
@@ -222,9 +222,9 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
             set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolftpm-master)
             message(STATUS "Looking in ${CURRENT_SEARCH_DIR_ALT}")
 
-            IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
+            IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
             if ( FOUND_WOLFTPM )
-                message(STATUS "Found wolfssl in master-suffix CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
+                message(STATUS "Found wolftpm in master-suffix CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
                 set(CURRENT_SEARCH_DIR "${CURRENT_SEARCH_DIR_ALT}")
                 set(${OUTPUT_FOUND_WOLFTPM_DIRECTORY} ${CURRENT_SEARCH_DIR} PARENT_SCOPE)
                 return()
@@ -232,26 +232,26 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
         endif()
 
         if ( FOUND_WOLFTPM )
-            # if we already found the source, skip attempt of "wolfssl"
+            # if we already found the source, skip attempt of "wolftpm"
         else()
-            set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolfssl)
+            set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolftpm)
             message(STATUS "Looking in ${CURRENT_SEARCH_DIR_ALT}")
 
-            IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
+            IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
             if ( FOUND_WOLFTPM )
-                message(STATUS "Found wolfssl in CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
+                message(STATUS "Found wolftpm in CURRENT_SEARCH_DIR_ALT = ${CURRENT_SEARCH_DIR_ALT}")
                 set(CURRENT_SEARCH_DIR "${CURRENT_SEARCH_DIR_ALT}")
                 set(${OUTPUT_FOUND_WOLFTPM_DIRECTORY} ${CURRENT_SEARCH_DIR} PARENT_SCOPE)
                 return()
             endif()
         endif()
 
-        # Next check for no user suffix "wolfssl" subdirectory as we recurse up the directory tree
-        set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolfssl)
+        # Next check for no user suffix "wolftpm" subdirectory as we recurse up the directory tree
+        set(CURRENT_SEARCH_DIR_ALT ${CURRENT_SEARCH_DIR}/wolftpm)
         # if(EXISTS ${CURRENT_SEARCH_DIR} AND IS_DIRECTORY ${CURRENT_SEARCH_DIR} AND EXISTS "${CURRENT_SEARCH_DIR}/wolfcrypt/src")
-        IS_WOLFSSL_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
+        IS_WOLFTPM_SOURCE("${CURRENT_SEARCH_DIR_ALT}" FOUND_WOLFTPM )
         if ( FOUND_WOLFTPM )
-            message(STATUS "Found wolfssl in CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
+            message(STATUS "Found wolftpm in CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
             set(${OUTPUT_FOUND_WOLFTPM_DIRECTORY} ${CURRENT_SEARCH_DIR} PARENT_SCOPE)
             return()
         endif()
@@ -261,7 +261,7 @@ function(FIND_WOLFTPM_DIRECTORY OUTPUT_FOUND_WOLFTPM_DIRECTORY)
         get_filename_component(CURRENT_SEARCH_DIR "${CURRENT_SEARCH_DIR}" DIRECTORY)
         message(STATUS "Next CURRENT_SEARCH_DIR = ${CURRENT_SEARCH_DIR}")
         if( "${PRIOR_SEARCH_DIR}" STREQUAL "${CURRENT_SEARCH_DIR}" )
-            # When the parent is current directory, cannot go any further. We didn't find wolfssl.
+            # When the parent is current directory, cannot go any further. We didn't find wolftpm.
             # When the search directory is empty, we'll give up.
             set(CURRENT_SEARCH_DIR "")
         endif()
@@ -274,12 +274,12 @@ endfunction()
 
 # Example usage:
 #
-# Simply find the WOLFSSL_DIRECTORY by searching parent directories:
+# Simply find the WOLFTPM_DIRECTORY by searching parent directories:
 #   FIND_WOLFTPM_DIRECTORY(WOLFTPM_ROOT)
 #
 
 if(CMAKE_BUILD_EARLY_EXPANSION)
-    message(STATUS "wolfssl component CMAKE_BUILD_EARLY_EXPANSION:")
+    message(STATUS "wolftpm component CMAKE_BUILD_EARLY_EXPANSION:")
     idf_component_register(
                             REQUIRES "${COMPONENT_REQUIRES}"
                             PRIV_REQUIRES # esp_hw_support
@@ -288,7 +288,7 @@ if(CMAKE_BUILD_EARLY_EXPANSION)
 else()
     # not CMAKE_BUILD_EARLY_EXPANSION
     message(STATUS "************************************************************************************************")
-    message(STATUS "wolfssl component config:")
+    message(STATUS "wolftpm component config:")
     message(STATUS "************************************************************************************************")
 
 #    if ( "${CONFIG_TARGET_PLATFORM}" STREQUAL "esp8266")
@@ -302,7 +302,7 @@ else()
 
     # search for wolfTPM
     if(WOLFTPM_ROOT)
-        IS_WOLFSSL_SOURCE("${WOLFTPM_ROOT}" FOUND_WOLFTPM)
+        IS_WOLFTPM_SOURCE("${WOLFTPM_ROOT}" FOUND_WOLFTPM)
         if(FOUND_WOLFTPM)
             message(STATUS "Found WOLFTPM_ROOT via CMake specification.")
         else()
@@ -318,11 +318,11 @@ else()
 
 
     if(WOLFTPM_ROOT)
-        message(STATUS "Confirmed wolfssl directory at: ${WOLFTPM_ROOT}")
+        message(STATUS "Confirmed wolftpm directory at: ${WOLFTPM_ROOT}")
     else()
-        message(STATUS "Failed: wolfssl directory not found.")
-        # Abort. We need wolfssl _somewhere_.
-        message(FATAL_ERROR "Could not find wolfssl in any parent directory named wolftpm-${THIS_USER}, wolftpm-master, or wolfssl.\n"
+        message(STATUS "Failed: wolftpm directory not found.")
+        # Abort. We need wolftpm _somewhere_.
+        message(FATAL_ERROR "Could not find wolftpm in any parent directory named wolftpm-${THIS_USER}, wolftpm-master, or wolftpm.\n"
                             "Try setting WOLFTPM_ROOT environment variable, cmake variable in project, copy source, or use managed components.")
         # Abort CMake after fatal error.
     endif()
@@ -336,7 +336,8 @@ else()
 
     message(STATUS "This COMPONENT_SRCDIRS = ${COMPONENT_SRCDIRS}")
 
-    # wolfSSL user_settings.h is in the local project.
+    # wolfTPM user_settings.h is in the local project in the wolfssl component.
+
     set(WOLFTPM_PROJECT_DIR "${CMAKE_HOME_DIRECTORY}/components/wolftpm")
 
     string(REPLACE "/" "//" STR_WOLFTPM_PROJECT_DIR "${WOLFTPM_PROJECT_DIR}")
@@ -358,7 +359,7 @@ else()
     #
     if( EXISTS "${WOLFTPM_PROJECT_DIR}" AND EXISTS "$ENV{IDF_PATH}/components/wolftpm/" )
         #
-        # wolfSSL found in both ESP-IDF and local project - needs to be resolved by user
+        # wolfTPM found in both ESP-IDF and local project - needs to be resolved by user
         #
         message(STATUS "")
         message(STATUS "**************************************************************************************")
@@ -374,7 +375,7 @@ else()
         message(STATUS "**************************************************************************************")
         message(STATUS "")
 
-        message(FATAL_ERROR "Please use wolfSSL in either local project or Espressif components, but not both.")
+        message(FATAL_ERROR "Please use wolfTPM in either local project or Espressif components, but not both.")
         # Abort CMake after fatal error.
 
         # Optional: if you change the above FATAL_ERROR to STATUS you can warn at runtime with this macro definition:
@@ -383,35 +384,35 @@ else()
     else()
         if( EXISTS "$ENV{IDF_PATH}/components/wolftpm/" )
             #
-            # wolfSSL found in ESP-IDF components and is assumed to be already configured in user_settings.h via setup.
+            # wolfTPM found in ESP-IDF components and is assumed to be already configured in user_settings.h via setup.
             #
             message(STATUS "")
             message(STATUS "Using components/wolftpm in IDF_PATH = $ENV{IDF_PATH}")
             message(STATUS "")
         else()
             #
-            # wolfSSL is not an ESP-IDF component.
-            # We need to now determine if it is local and if so if it is part of the wolfSSL repo,
-            # or if  wolfSSL is simply installed as a local component.
+            # wolfTPM is not an ESP-IDF component.
+            # We need to now determine if it is local and if so if it is part of the wolfTPM repo,
+            # or if  wolfTPM is simply installed as a local component.
             #
 
             if( EXISTS "${WOLFTPM_PROJECT_DIR}" )
                 #
-                # wolfSSL found in local project.
+                # wolfTPM found in local project.
                 #
                 if( EXISTS "${WOLFTPM_PROJECT_DIR}/src/" )
                     message(STATUS "")
                     message(STATUS "Using installed project ./components/wolftpm in CMAKE_HOME_DIRECTORY = ${CMAKE_HOME_DIRECTORY}")
                     message(STATUS "")
                     #
-                    # Note we already checked above and confirmed there's not another wolfSSL installed in the ESP-IDF components.
+                    # Note we already checked above and confirmed there's not another wolfTPM installed in the ESP-IDF components.
                     #
                     # We won't do anything else here, as it will be assumed the original install completed successfully.
                     #
-                else() # full wolfSSL not installed in local project
+                else() # full wolfTPM not installed in local project
                     #
-                    # This is the developer repo mode. wolfSSL will be assumed to be not installed to ESP-IDF nor local project
-                    # In this configuration, we are likely running a wolfSSL example found directly in the repo.
+                    # This is the developer repo mode. wolfTPM will be assumed to be not installed to ESP-IDF nor local project
+                    # In this configuration, we are likely running a wolfTPM example found directly in the repo.
                     #
                     message(STATUS "")
                     message(STATUS "Using developer repo ./components/wolftpm in CMAKE_HOME_DIRECTORY = ${CMAKE_HOME_DIRECTORY}")
@@ -423,16 +424,16 @@ else()
                 # we did not find a ./components/wolfssl/include/ directory from this pass of cmake.
                 if($WOLFTPM_FOUND_IDF)
                     message(STATUS "")
-                    message(STATUS "WARNING: wolfSSL not found.")
+                    message(STATUS "WARNING: wolfTPM not found.")
                     message(STATUS "")
                 else()
                     # probably needs to be re-parsed by Espressif
-                    message(STATUS "wolfSSL found IDF. Project Source:${PROJECT_SOURCE_DIR}")
+                    message(STATUS "wolfTPM found IDF. Project Source:${PROJECT_SOURCE_DIR}")
                 endif() # else we have not found ESP-IDF yet
-            endif() # else not a local wolfSSL component
+            endif() # else not a local wolfTPM component
 
         endif() #else not an ESP-IDF component
-    endif() # else not local copy and EDP-IDF wolfSSL
+    endif() # else not local copy and EDP-IDF wolfTPM
 
 
     # RTOS_IDF_PATH is typically:

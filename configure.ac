@@ -1,9 +1,9 @@
 # wolftpm
-# Copyright (C) 2021 wolfSSL Inc.
+# Copyright (C) 2024 wolfSSL Inc.
 # All right reserved.
 
-AC_COPYRIGHT([Copyright (C) 2014-2021 wolfSSL Inc.])
-AC_INIT([wolftpm],[3.2.0],[https://github.com/wolfssl/wolfTPM/issues],[wolftpm],[http://www.wolfssl.com])
+AC_COPYRIGHT([Copyright (C) 2014-2024 wolfSSL Inc.])
+AC_INIT([wolftpm],[3.8.0],[https://github.com/wolfssl/wolfTPM/issues],[wolftpm],[http://www.wolfssl.com])
 
 AC_PREREQ([2.63])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -28,7 +28,7 @@ AC_ARG_PROGRAM
 
 AC_CONFIG_HEADERS([src/config.h])
 
-WOLFTPM_LIBRARY_VERSION=16:2:0
+WOLFTPM_LIBRARY_VERSION=16:5:0
 #                        | | |
 #                 +------+ | +---+
 #                 |        |     |
@@ -80,11 +80,12 @@ AS_IF([test "x$ax_enable_debug" != "xno"],
 
 
 AX_PTHREAD([
+    AC_DEFINE([HAVE_PTHREAD], [1], [Define if you have POSIX threads libraries and header files.])
     # If AX_PTHREAD is adding -Qunused-arguments, need to prepend with
     # -Xcompiler libtool will use it. Newer versions of clang don't need
     # the -Q flag when using pthreads.
     AS_CASE([$PTHREAD_CFLAGS],[-Qunused-arguments*],[PTHREAD_CFLAGS="-Xcompiler $PTHREAD_CFLAGS"])
-    AM_CFLAGS="$AM_CFLAGS $PTHREAD_CFLAGS -DHAVE_PTHREAD"])
+    AM_CFLAGS="$AM_CFLAGS $PTHREAD_CFLAGS"])
 
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -355,7 +356,7 @@ then
 
     # Reduces max packet and buffer sizes to 1024 bytes
     # RSA KeyGen AES response is 1329 MAX_RESPONSE_SIZE
-    AM_CFLAGS="$AM_CFLAGS -DMAX_COMMAND_SIZE=1024 -DMAX_RESPONSE_SIZE=1350 -DWOLFTPM2_MAX_BUFFER=1500 -DMAX_DIGEST_BUFFER=973"
+    AM_CFLAGS="$AM_CFLAGS -DMAX_COMMAND_SIZE=1024 -DMAX_RESPONSE_SIZE=1350 -DMAX_DIGEST_BUFFER=896"
 
     # If parameter encryption is not used then maximum session count is one
     if test "x$ENABLED_WOLFCRYPT" = "xno"
@@ -416,6 +417,17 @@ AC_ARG_ENABLE([firmware],
 if test "x$ENABLED_FIRMWARE" = "xyes"
 then
     AM_CFLAGS="$AM_CFLAGS -DWOLFTPM_FIRMWARE_UPGRADE"
+fi
+
+# Enable support for provisioning identity keys for device and attestation
+AC_ARG_ENABLE([provisioning],
+    [AS_HELP_STRING([--enable-provisioning],[Enable support for Provisioning Initial Device Identity (IDevID) and Attestation Identity Keys (default: enabled)])],
+    [ ENABLED_PROVISIONING=$enableval ],
+    [ ENABLED_PROVISIONING=yes ]
+    )
+if test "x$ENABLED_PROVISIONING" = "xyes"
+then
+    AM_CFLAGS="$AM_CFLAGS -DWOLFTPM_PROVISIONING"
 fi
 
 

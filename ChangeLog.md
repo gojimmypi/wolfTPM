@@ -1,5 +1,90 @@
 # Release Notes
 
+## wolfTPM Release 3.8.0 (Jan 7, 2025)
+
+**Summary**
+
+Fixes for session auth on key bind and password policy. Added NV extend example used with Bus_Protection_Guidance. New wolfTPM2_NVExtend wrapper and example. Added new NV policy write/read wrapper API's used with policy auth
+
+**Detail**
+
+* Fixed issue with auth session binding. (PR #389)
+* Fixed possible missing `wc_GetPkcs8TraditionalOffset`. (PR #392)
+* Fixed issue with `wolfTPM2_PolicyHash` where input digest could be too large. (PR #389)
+* Added example for NV extend based on the TCG "bus protection guidance". (PR #389)
+* Added support for building wolfTPM against older wolfCrypt (like v4.7.0) including CI test. (PR #390)
+* Added HAL IO support for Microchip I2C bit-bang (PR #340)
+* Created separate tool (./examples/management/tpmclear) for performing the TPM2_Clear (don't use args in wrap_test). (PR #391)
+* Switched `wolfTPM2_LoadSymmetricKey` to default to the `WOLFTPM2_WRAP_DIGEST` for hash algorithm and not default to SHA1 for some sizes. (PR #388)
+* Improved TPM NV write debug logging to show before. (PR #392)
+* Cleanup the `SensitiveToPrivate` function stack variables. (PR #388)
+* Cleanup comments on EK/SRK. (PR #388)
+* Various spellings, tabs, execute bit on .c and formatting. (PR #386, #388, #392)
+
+
+## wolfTPM Release 3.6.0 (Nov 5, 2024)
+
+**Summary**
+
+Release includes minor bug fixes and new features such as TPM provisioning of IDevID/IAK, improved capabilities parsing, new TPM2_Certify example, new wolfTPM2_CreatePrimaryKey_ex API for creation ticket and tested support with Nations NS350 TPM.
+
+**Detail**
+
+* Fixed issue with `TPM2_SetupPCRSel` and added test cases. (PR #372)
+* Fixed `RC_WARN` error codes (broken in commit f983525f56c245a8bc998bb20f1f6a8cc7ec748f). (PR #378)
+* Fixed issue with RSA/ECC symmetric field (should only be populated with restricted/decrypt) (PR #375)
+* Fixed examples/keygen/keygen `-sym=` argument. (PR #372)
+* Fixed building wolfCrypt/wolfTPM without ECC or RSA and added tests. (PR #371)
+* Fixed file descriptor check for `/dev/tpm0` (PR #366)
+* Fixed STM32 GPIO SPI CS control to use pin number as bit offset, not direct value (PR #380)
+* Fixed issues building with no filesystem. (PR #374)
+* Added support for parsing all capabilities from (TPM2_GetCapability) (PR #383)
+* Added support for creation of IDevID or IAK with `examples/keygen/create_primary`. (PR #369)
+* Added support for Nations NS350. (PR #382)
+* Added example for `TPM2_Certify` (see examples/attestation/certify) (PR #369)
+* Added new `wolfTPM2_CreatePrimaryKey_ex` and `WOLFTPM2_PKEY` that supports returning creation ticket/hash. (PR #369)
+* Added key templates for initial device (IDevID) and attestation keys (IAK). (PR #369)
+* Added new build option for TPM provisioning (`--enable-provisioning` on by default). (PR #369)
+* Added simple capabilities example (`examples/wrap/caps`) (PR #382)
+* Added example to manual verify quote with ECC signature. (PR #379)
+* Added tests for policy seal/unseal with multiple PCR's. (PR #377)
+* Added `-alg` argument for PCR extend (PR #383)
+* Added helper to get wolfCrypt hash type `TPM2_GetTpmHashType` (PR #384)
+* Added new policy hash helper API `wolfTPM2_PolicyHash` (PR #369)
+* Added documentation for `/dev/tpm0` permissions (PR #366)
+* Improved the TPM TLS examples for use with `WOLFTPM_MFG_IDENTITY` (PR #376)
+* Moved PTHREAD definition from options.h to config.h (avoids possible re-declaration issue) PR (#381)
+* Switched `handle`/`nvIndex` string parsing to use `strtoul`.	(PR #369)
+* Various spelling and documentation cleanups. (PR #366 / PR #373)
+
+
+## wolfTPM Release 3.4.0 (July 30, 2024)
+
+**Summary**
+
+Added Endorsement Key Certificate support. Added support for NV read/write with policy. Added policy password support. Refactor of the session authentication structures.
+
+**Detail**
+
+* Added EK Certificate Support (PR #360)
+  - Added new API's `wolfTPM2_GetKeyTemplate_EK` and `wolfTPM2_GetKeyTemplate_EK` for getting EK public templates used for generating the EK primary key.
+  - Added `examples/endorsement/get_ek_certs` for showing how to retrieve and validate the manufacturers endorsement key certificates.
+* Improvements to auth handling to support Policy Password and Policy Auth Value (PR #350)
+  - Refactor to eliminate confusing cast between TPMS_AUTH_COMMAND and TPM2_AUTH_SESSION.
+  - Support for policy auth value and policy password.
+  - Add new NV policy write/read API's `wolfTPM2_NVWriteAuthPolicy` and `wolfTPM2_NVReadAuthPolicy`.
+* Fixed ST33KTPM IAK/IDevID provisioning NV indexes. (PR #361)
+* Fixed TLS example build issues with wolfSSL not having crypto callback or PK callback enabled. (PR #360)
+* Fixed CSR version (use version 0) (PR #359)
+* Fixed issue with Doxygen generation of wolfTPM due to doxybook2 crashing on unnamed enum. (PR #357)
+* Fixed HMAC session save last (not typically used) (PR #355)
+* Fixed Infineon I2C HAL gating logic (PR #347)
+* Added documentation for IAK/IDevID build options. (PR #361)
+* Added support for Espressif IDE (see IDE/Espressif) (PR #321)
+* Added tests for create_primary (PR #345)
+* Improved software TPM (docs/SWTPM.md) documentation (PR #348)
+
+
 ## wolfTPM Release 3.2.0 (Apr 24, 2024)
 
 **Summary**
