@@ -273,6 +273,7 @@ typedef UINT32 TPM_CC;
 
 /* Response Codes */
 typedef enum {
+    TPM_RC_ERROR    = -1,
     TPM_RC_SUCCESS  = 0x000,
     TPM_RC_BAD_TAG  = 0x01E,
 
