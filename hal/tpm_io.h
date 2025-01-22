@@ -122,6 +122,9 @@ WOLFTPM_LOCAL int TPM2_IoCb_Infineon_TriCore_SPI(TPM2_CTX* ctx, const byte* txBu
 #elif defined(WOLFTPM_MICROCHIP_HARMONY)
 WOLFTPM_LOCAL int TPM2_IoCb_Microchip_SPI(TPM2_CTX* ctx, const byte* txBuf, byte* rxBuf,
     word16 xferSz, void* userCtx);
+#elif defined(WOLFSSL_ESPIDF)
+WOLFTPM_LOCAL int TPM2_IoCb_Espressif_SPI(TPM2_CTX* ctx, const byte* txBuf,
+                                   byte* rxBuf, word16 xferSz, void* userCtx);
 #endif
 
 #endif /* WOLFTPM_I2C */
