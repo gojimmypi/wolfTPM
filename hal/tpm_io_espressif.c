@@ -446,6 +446,21 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
 /*****************************************************************************/
 /*                                      SPI                                  */
 /*****************************************************************************/
+/* Example code may have set config defaults from main/Kconfig.projbuild     */
+#ifdef CONFIG_SPI_MISO
+    #define PIN_NUM_MISO       CONFIG_SPI_MISO
+#endif
+#ifdef CONFIG_SPI_MOSI
+    #define PIN_NUM_MOSI       CONFIG_SPI_MOSI
+#endif
+#ifdef CONFIG_SPI_MOSI
+    #define PIN_NUM_CLK        CONFIG_SPI_CLK
+#endif
+#ifdef CONFIG_SPI_MOSI
+    #define PIN_NUM_CLK        CONFIG_SPI_CS
+#endif
+
+/* If not set vis user or kconfig, try some well-known defaults */
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
     /* FSPI (HOST_SPI2) on esp32-s3-wroom */
     #ifndef PIN_NUM_MISO
