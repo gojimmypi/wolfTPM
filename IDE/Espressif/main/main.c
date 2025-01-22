@@ -98,8 +98,11 @@ void app_main(void)
 
 #ifdef WOLFTPM_TLS_EXAMPLE
     if (ret == 0) {
+        /* TODO the first parameter for userCtx must not be NULL */
         ret = TPM2_TLS_ClientArgs(NULL, argc, argv);
     }
+#else
+    ESP_LOGI(TAG, "WOLFTPM_TLS_EXAMPLE is not enqabled. Test skipped.");
 #endif
 
 #ifdef WOLFSSL_ESPIDF_VERBOSE_EXIT_MESSAGE

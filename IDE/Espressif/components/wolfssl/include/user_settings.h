@@ -44,7 +44,7 @@
 #define WOLFSSL_ESPIDF
 
 /* optionally enable a TLS test */
-#define WOLFTPM_TLS_EXAMPLE
+/* #define WOLFTPM_TLS_EXAMPLE */
 
 /* We don't use WiFi, so don't compile in the esp-sdk-lib WiFi helpers: */
 /* #define USE_WOLFSSL_ESP_SDK_WIFI */
@@ -647,7 +647,7 @@ Turn on timer debugging (used when CPU cycles not available)
 /*****************************************************************************/
 
 /* How many main app test loop interations? */
-#define WOLFTPM_MAIN_TEST_ITERATIONS 100
+#define WOLFTPM_MAIN_TEST_ITERATIONS 2
 
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
@@ -678,8 +678,8 @@ Turn on timer debugging (used when CPU cycles not available)
 
 /* I2C GPIO settings are defined in idf.py menuconfig
  *
- * CONFIG_I2C_MASTER_SCL (default SCL GPIO pin is 19)
- * CONFIG_I2C_MASTER_SDA (default SDA GPIO pin is 18)
+ * CONFIG_I2C_MASTER_SCL (default SCL GPIO pin is 21)
+ * CONFIG_I2C_MASTER_SDA (default SDA GPIO pin is 22)
  */
 
 /* The default I2C_MASTER_NUM is 0 but can be overridden: */
