@@ -21,11 +21,19 @@ The `native_test.h` is currently _copied_ to the example and not used. Consider 
 
 ### I2C Pin Assignments
 
+Set I2C in Example Configuration `SCL GPIO NUM` and `SDA GPIO NUM`. Although other pins may be used, the recommended values for the ESP32 are:
+
+- `GPIO 21` = `I2C SDA`
+- `GPIO 22` = `I2C SCL`
+
 **Note:** The following pin assignments are used by default, you can change these in the `menuconfig` .
 
 |                  | SDA            | SCL            |
 | ---------------- | -------------- | -------------- |
+| Wire Color       | White          | Gray           |
 | ESP I2C Master   | I2C_MASTER_SDA | I2C_MASTER_SCL |
+| ESP32 alt        | GPIO 18        | GPIO 19        |
+| ESP32            | GPIO 21        | GPIO 22        |
 | TPM2 Device      | SDA            | SCL            |
 
 For the actual default value of `I2C_MASTER_SDA` and `I2C_MASTER_SCL` see `Example Configuration` in `menuconfig`.
@@ -43,10 +51,20 @@ See [SPI Master Driver docs](https://docs.espressif.com/projects/esp-idf/en/stab
 
 > SPI1 is not a GP-SPI. SPI Master driver also supports SPI1 but with quite a few limitations, see [Notes on Using the SPI Master Driver on SPI1 Bus](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/spi_master.html#spi-master-on-spi1-bus).
 
-|                | MOSI        | MISO        | CLK        | CS        | Vcc 3.3v  | GND    |
-| -------------- | ----------- | ----------- | ---------- | --------- |---------- | ------ |
-| ESP I2C Master | MOSI Pin 11 | MICO Pin 13 | CLK Pin 12 | CS Pin 10 |
-| SPI RPi HAT    | MOSI Pin 19 | MISO Pin 21 | CLK Pin 23 |           | 3v3 Pin 1 | Pin 25 |
+|                | MOSI        | MISO        | CLK        | CS            | Vcc 3.3v  | GND    |
+| -------------- | ----------- | ----------- | ---------- | ------------- |---------- | ------ |
+| Wire color     | Gray        | White       | Blue       | Brown         | Red       | Black  |
+| ESP32-S3 name  | FSPID       | FSPIQ       | FSPICLK    | FSPICS0       | 3v3       | GND    |
+| ESP32-S3       | MOSI Pin 11 | MISO Pin 13 | CLK Pin 12 | CS Pin 10     |           |        |
+| ESP32 name     | VSPI MOSI   | VSPI MISO   | VPI CLK    | VSPI CS       |           |        |
+| ESP32          | MOSI Pin 23 | MISO Pin 19 | CLK Pin 18 | CS Pin 5      |           |        |
+| SPI RPi HAT    | Header 19   | Header 21   | Header 23  | Header 26     | 3v3 Pin 1 | Pin 25 |
+| Optiga Chip    | MOSI Pin 21 | MISO Pin 24 | CLK Pin 19 | CE1 (CS/TEST) |           |        |
+
+NOTE: The `CE0` pin on the Optiga RPi hat is noted with the respective `R6` resistor "n.p." (this typically means "not populated").
+With no connection between `CE0` and pin 20 of IC2 (`CS#`/`TEST#`) it is recommended to use `CE1` for `CS` (chip select).
+
+NOTE: The SPI GPIO Pin 13 is also used by the JTAG programmer / debugger `TCK` / `CLK` / `SCL`.
 
 See [Optiga TPM SLB 967s Raspberry Pi SPI Hat](https://www.infineon.com/dgdl/Infineon-OPTIGA%20TPM%20SLB%209672%20FW15-DataSheet-v01_02-EN.pdf?fileId=8ac78c8c850f4bee01852eeaeb200bc8)
 
@@ -56,6 +74,7 @@ See [Optiga TPM SLB 967s Raspberry Pi SPI Hat](https://www.infineon.com/dgdl/Inf
 
 If problems are encountered with the I2C module:
 
+- Check power requirements. ESP32 dev boards typically do not have enough on-board power for additional peripherals.
 - Ensure the TPM module is reset at boot time (briefly bring TPM Module RST low).
 - Beware that printing to the UART during an I2C transaction may affect timing and cause errors.
 - Ensure the TPM module has been reset after flash updated.

@@ -446,18 +446,46 @@ int TPM2_IoCb_Espressif_I2C(TPM2_CTX* ctx, int isRead, word32 addr,
 /*****************************************************************************/
 /*                                      SPI                                  */
 /*****************************************************************************/
-/* FSPI (HOST_SPI2) on esp32-s3-wroom */
-#ifndef PIN_NUM_MISO
-    #define PIN_NUM_MISO 13
-#endif
-#ifndef PIN_NUM_MOSI
-    #define PIN_NUM_MOSI 11
-#endif
-#ifndef PIN_NUM_CLK
-    #define PIN_NUM_CLK  12
-#endif
-#ifndef PIN_NUM_CS
-    #define PIN_NUM_CS   10
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+    /* FSPI (HOST_SPI2) on esp32-s3-wroom */
+    #ifndef PIN_NUM_MISO
+        #define PIN_NUM_MISO 13
+    #endif
+    #ifndef PIN_NUM_MOSI
+        #define PIN_NUM_MOSI 11
+    #endif
+    #ifndef PIN_NUM_CLK
+        #define PIN_NUM_CLK  12
+    #endif
+    #ifndef PIN_NUM_CS
+        #define PIN_NUM_CS   10
+    #endif
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+    #ifndef PIN_NUM_MISO
+        #define PIN_NUM_MISO X
+    #endif
+    #ifndef PIN_NUM_MOSI
+        #define PIN_NUM_MOSI X
+    #endif
+    #ifndef PIN_NUM_CLK
+        #define PIN_NUM_CLK  x
+    #endif
+    #ifndef PIN_NUM_CS
+        #define PIN_NUM_CS   x
+    #endif
+#else
+    #ifndef PIN_NUM_MISO
+        #error "PIN_NUM_MISO undefined"
+    #endif
+    #ifndef PIN_NUM_MOSI
+        #error "PIN_NUM_MOSI undefined"
+    #endif
+    #ifndef PIN_NUM_CLK
+        #error "PIN_NUM_CLK undefined"
+    #endif
+    #ifndef PIN_NUM_CS
+        #error "PIN_NUM_CS undefined"
+    #endif
 #endif
 
 /* NOTE: on esp, 64 byte limit includes data and header!!! */

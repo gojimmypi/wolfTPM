@@ -5,7 +5,7 @@ menu "Example Configuration"
     config I2C_MASTER_SCL
         int "SCL GPIO Num"
         range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-        default 19 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
+        default 22 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
         default 2
         help
             GPIO number for I2C Master clock line.
@@ -13,9 +13,45 @@ menu "Example Configuration"
     config I2C_MASTER_SDA
         int "SDA GPIO Num"
         range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-        default 18 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
+        default 21 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
         default 1
         help
             GPIO number for I2C Master data line.
+
+    config SPI_MOSI
+        int "SPI MOSI GPIO Num"
+        range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+        default 23 if IDF_TARGET_ESP32
+        default 11 if IDF_TARGET_ESP32S3
+        default 1
+        help
+            GPIO number for SPI MOSI
+
+    config SPI_MISO
+        int "SPI MISO GPIO Num"
+        range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+        default 19 if IDF_TARGET_ESP32
+        default 13 if IDF_TARGET_ESP32S3
+        default 1
+        help
+            GPIO number for SPI MOSI
+
+    config SPI_CLK
+        int "SPI CLK GPIO Num"
+        range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+        default 18 if IDF_TARGET_ESP32
+        default 12 if IDF_TARGET_ESP32S3
+        default 1
+        help
+            GPIO number for SPI Clock
+
+    config SPI_CS
+        int "SPI CS GPIO Num"
+        range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+        default 5  if IDF_TARGET_ESP32
+        default 10 if IDF_TARGET_ESP32S3
+        default 1
+        help
+            GPIO number for SPI Chip Select
 
 endmenu

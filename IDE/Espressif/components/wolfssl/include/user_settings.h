@@ -652,7 +652,7 @@ Turn on timer debugging (used when CPU cycles not available)
 /* WOLFTPM_ADV_IO allows callback code in tpm_io_espressif.c */
 #define WOLFTPM_ADV_IO
 
-/* Choices are I2C or SPI*/
+/* Choices are I2C or SPI */
 /* WOLFTPM_I2C or not; when not defined, assumes SPI. */
 #define WOLFTPM_I2C
 
