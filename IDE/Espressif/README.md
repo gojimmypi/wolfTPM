@@ -19,6 +19,8 @@ The `native_test.h` is currently _copied_ to the example and not used. Consider 
 
 ## Pin assignments
 
+See file: `main/Kconfig.projbuild` for `sdkconfig` defaults.
+
 ### I2C Pin Assignments
 
 Set I2C in Example Configuration `SCL GPIO NUM` and `SDA GPIO NUM`. Although other pins may be used, the recommended values for the ESP32 are:
