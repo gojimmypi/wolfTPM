@@ -194,6 +194,13 @@ int TPM2_TLS_ClientArgs(void* userCtx, int argc, char *argv[])
         argc--;
     }
 
+#ifdef WOLFSSL_ESPIDF
+    if (paramEncAlg == TPM_ALG_ERROR) {
+        printf("Using default paramEncAlg = TPM_ALG_CFB");
+        paramEncAlg = TPM_ALG_CFB;
+    }
+#endif
+
     printf("TPM2 TLS Client Example\n");
     printf("\tUse %s keys\n", useECC ? "ECC" : "RSA");
     printf("\tUse Parameter Encryption: %s\n", TPM2_GetAlgName(paramEncAlg));
